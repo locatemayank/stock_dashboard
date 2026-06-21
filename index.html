@@ -203,7 +203,7 @@
       .dashboard{
         height:100dvh; overflow:hidden;
         grid-template-rows:auto auto 1fr auto;
-        padding:10px 14px 12px; gap:2px;
+        padding:10px 14px 12px; gap:8px;
       }
 
       /* Hide time/date/temp on portrait phone — more space for stocks */
@@ -229,9 +229,9 @@
       /* Market strip: centered, organized 2-row layout */
       .market-strip{
         flex-direction:column; align-items:center;
-        padding:8px 0 10px; gap:8px; width:100%;
+        padding:10px 0 12px; gap:10px; width:100%;
         border-bottom:1px solid rgba(255,255,255,.06);
-        margin-bottom:4px;
+        margin-bottom:0;
       }
       /* Row 1: 3 equal index tiles */
       .index-pills{display:flex;gap:6px;width:100%;justify-content:center;}
@@ -252,13 +252,13 @@
       .mkt-badge{padding:5px 14px;font-size:11px;}
       .fng-badge{padding:5px 14px;font-size:11px;}
 
-      /* Portfolio: compact */
-      .portfolio-section{padding:8px 0 8px;}
+      /* Portfolio: more breathing room */
+      .portfolio-section{padding:12px 0 16px;border-bottom:1px solid rgba(255,255,255,.06);}
       .pf-label{font-size:9px;letter-spacing:.2em;}
       .pf-total{font-size:clamp(36px,12vw,64px);}
-      .pf-change{font-size:clamp(12px,3.8vw,16px);}
-      .pf-meta{gap:8px;margin-top:6px;}
-      .pf-meta-chip{padding:2px 10px;}
+      .pf-change{font-size:clamp(12px,3.8vw,16px);margin-top:6px;}
+      .pf-meta{gap:8px;margin-top:12px;}
+      .pf-meta-chip{padding:3px 12px;}
       .pf-meta-label{font-size:8px;}
       .pf-meta-val{font-size:11px;}
 
