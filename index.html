@@ -165,6 +165,13 @@
     .td-loading { color:var(--text-dim);font-size:11px;font-style:italic; }
     .td-error   { color:var(--accent-red);font-size:10px; }
     .chg-short  { display:none; } /* shown only in portrait via media query */
+    /* Analyst rating badge */
+    .rat-badge { display:inline-flex;align-items:center;font-size:9px;font-weight:700;letter-spacing:.05em;border-radius:10px;padding:2px 7px;margin-top:3px;white-space:nowrap; }
+    .rat-sbuy  { background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.3);color:#00e676; }
+    .rat-buy   { background:rgba(105,240,174,.1);border:1px solid rgba(105,240,174,.25);color:var(--accent-green); }
+    .rat-hold  { background:rgba(255,238,88,.08);border:1px solid rgba(255,238,88,.2);color:#fff176; }
+    .rat-sell  { background:rgba(255,183,77,.1);border:1px solid rgba(255,183,77,.25);color:var(--accent-warm); }
+    .rat-ssell { background:rgba(239,83,80,.1);border:1px solid rgba(239,83,80,.25);color:var(--accent-red); }
     /* 52-week bar */
     .week52-wrap { display:flex;align-items:center;gap:4px;margin-top:4px; }
     .week52-edge { font-size:8px;color:var(--text-dim);letter-spacing:.04em;width:12px;text-align:center;flex-shrink:0; }
@@ -194,7 +201,10 @@
     @media(max-width:768px){
       .dashboard{padding:14px 18px 12px;}
       .stock-table th,.stock-table td{padding:8px 10px;}
-      .td-name,.week52-wrap{display:none;}
+      .td-name{display:none;}
+      /* 52W bar stays visible in portrait — compact enough to fit */
+      .week52-bar{max-width:60px;}
+      .week52-pos{font-size:7px;}
     }
 
     /* ── Phone portrait (sticky top, table scrolls inside) ── */
@@ -432,6 +442,7 @@ function savePortfolio(p){ localStorage.setItem(STORAGE_KEY,JSON.stringify(p)); 
 var portfolio   = [];
 var priceData   = {};  // {SYM: {price,change,changePct,name,state,error}}
 var metricsData = {};  // {SYM: {high52,low52,beta,divYield}}
+var ratingsData = {};  // {SYM: {label,cls} e.g. {label:'BUY',cls:'rat-buy'}}
 var indexPrices = {};  // {SPY:{changePct},QQQ:{changePct},DIA:{changePct}}
 var finnhubKey  = '';
 var fetchTimer  = null;
@@ -558,6 +569,39 @@ function fetchOneSafe(symbol) {
     console.warn(symbol, e.message);
     if (finnhubKey) return fetchYahooSingle(symbol).catch(function(){ return {symbol:symbol,error:true}; });
     return {symbol:symbol, error:true};
+  });
+}
+
+// ── Finnhub analyst recommendations ──
+function calcRatingFromData(data) {
+  if (!data || !data.length) return null;
+  var r = data[0]; // most recent period
+  var total = (r.buy||0) + (r.hold||0) + (r.sell||0) + (r.strongBuy||0) + (r.strongSell||0);
+  if (!total) return null;
+  var score = ((r.strongBuy||0)*5 + (r.buy||0)*4 + (r.hold||0)*3 + (r.sell||0)*2 + (r.strongSell||0)*1) / total;
+  if (score >= 4.2) return {label:'S.BUY', cls:'rat-sbuy'};
+  if (score >= 3.5) return {label:'BUY',   cls:'rat-buy'};
+  if (score >= 2.5) return {label:'HOLD',  cls:'rat-hold'};
+  if (score >= 1.8) return {label:'SELL',  cls:'rat-sell'};
+  return {label:'S.SELL', cls:'rat-ssell'};
+}
+
+function fetchOneRecommendation(symbol) {
+  if (!finnhubKey) return;
+  var url = 'https://finnhub.io/api/v1/stock/recommendation?symbol='+encodeURIComponent(symbol)+'&token='+encodeURIComponent(finnhubKey);
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var rating = calcRatingFromData(data);
+      if (rating) { ratingsData[symbol] = rating; renderTable(); }
+    }).catch(function(){});
+}
+
+function fetchAllRecommendations() {
+  if (!finnhubKey || !portfolio.length) return;
+  // Stagger by 200ms per stock to avoid rate limit bursts
+  portfolio.forEach(function(p, idx) {
+    setTimeout(function() { fetchOneRecommendation(p.symbol); }, idx * 200);
   });
 }
 
@@ -725,9 +769,12 @@ function renderTable() {
       changeCls=chg>0.001?'up':(chg<-0.001?'down':'flat');
       nameStr=pd.name;
     }
+    var rat = ratingsData[p.symbol];
+    var ratHtml = rat ? '<div class="rat-badge '+rat.cls+'">'+rat.label+'</div>' : '';
     html+='<tr>'
       +'<td><div class="td-symbol">'+p.symbol+'</div><div class="td-name">'+nameStr+'</div>'
-      +(pd&&pd.price&&!pd.error?render52wBar(p.symbol,pd.price):'')+'</td>'
+      +(pd&&pd.price&&!pd.error?render52wBar(p.symbol,pd.price):'')
+      +ratHtml+'</td>'
       +'<td class="td-shares">'+p.shares.toLocaleString()+'</td>'
       +'<td class="td-price">'+priceStr+'</td>'
       +'<td class="td-value">'+valueStr+'</td>'
@@ -940,8 +987,11 @@ function showDashboard(){
   fetchStockPrices();
   fetchIndices();
   fetchFearGreed();
+  // Fetch analyst ratings (staggered, refreshes every 30 min)
+  setTimeout(fetchAllRecommendations, 2000);
   clearInterval(fetchTimer);
   fetchTimer=setInterval(function(){fetchStockPrices();fetchIndices();fetchFearGreed();},REFRESH_MS);
+  setInterval(fetchAllRecommendations, 30*60*1000);
 }
 
 // Currency selector
