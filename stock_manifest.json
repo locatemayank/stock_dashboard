@@ -1,0 +1,19 @@
+{
+  "name": "Stock Dashboard",
+  "short_name": "Stocks",
+  "description": "Real-time portfolio tracker with indices, dividends, beta and Fear & Greed",
+  "start_url": "stock_dashboard.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#02030c",
+  "theme_color": "#00e5ff",
+  "orientation": "landscape-primary",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    { "src": "stock_icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "stock_icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Portfolio", "url": "stock_dashboard.html", "description": "View your stock portfolio" }
+  ]
+}
