@@ -189,7 +189,74 @@
     @keyframes fadeIn { from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);} }
     .spinner { display:inline-block;width:13px;height:13px;border:2px solid rgba(79,195,247,.2);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:5px; }
     @keyframes spin { to{transform:rotate(360deg);} }
-    @media(max-width:768px) { .dashboard{padding:12px 14px 10px;} .stock-table th,.stock-table td{padding:7px 8px;} .td-name,.week52-wrap{display:none;} }
+    /* ── Tablet portrait / small tablet ── */
+    @media(max-width:768px){
+      .dashboard{padding:14px 18px 12px;}
+      .stock-table th,.stock-table td{padding:8px 10px;}
+      .td-name,.week52-wrap{display:none;}
+    }
+
+    /* ── Phone portrait (scroll layout) ── */
+    @media(max-width:600px),(max-width:700px) and (orientation:portrait){
+      html,body{overflow-y:auto;}
+
+      .dashboard{
+        height:auto; min-height:100dvh;
+        grid-template-rows:auto auto auto auto auto;
+        padding:12px 14px 16px; gap:2px;
+      }
+
+      /* Top strip: [Time | Temp] then [Day Date] */
+      .top-strip{flex-wrap:wrap;padding-bottom:8px;margin-bottom:6px;}
+      .top-time-wrap{flex:1;order:1;}
+      .top-right{order:2;text-align:right;flex-shrink:0;}
+      .top-center{
+        order:3;width:100%;display:flex;align-items:baseline;gap:10px;
+        border-top:1px solid rgba(255,255,255,.07);padding-top:6px;margin-top:6px;
+      }
+      .top-dayname{font-size:clamp(14px,5vw,22px);letter-spacing:.2em;}
+      .top-datestr{font-size:clamp(10px,3.5vw,14px);letter-spacing:.1em;margin-top:0;opacity:.7;}
+      .top-time{font-size:clamp(42px,13vw,68px);}
+      .top-colon{font-size:clamp(42px,13vw,68px);}
+      .top-ampm{font-size:clamp(13px,4vw,20px);}
+      .top-temp{font-size:clamp(26px,8vw,42px);}
+      .top-condition{font-size:11px;}
+      .top-location{font-size:10px;}
+
+      /* Market strip: stack vertically */
+      .market-strip{flex-direction:column;align-items:flex-start;padding:6px 0 8px;gap:6px;}
+      .mkt-right{gap:8px;flex-wrap:wrap;}
+      .index-pills{gap:6px;}
+      .index-pill{padding:3px 10px;}
+      .fng-badge{padding:3px 10px;font-size:11px;}
+
+      /* Portfolio: compact */
+      .portfolio-section{padding:8px 0 8px;}
+      .pf-label{font-size:9px;letter-spacing:.2em;}
+      .pf-total{font-size:clamp(36px,12vw,64px);}
+      .pf-change{font-size:clamp(12px,3.8vw,16px);}
+      .pf-meta{gap:8px;margin-top:6px;}
+      .pf-meta-chip{padding:2px 10px;}
+      .pf-meta-label{font-size:8px;}
+      .pf-meta-val{font-size:11px;}
+
+      /* Stock table: compact, natural height (page scrolls) */
+      .stock-table-wrap{border-radius:14px;overflow:hidden;}
+      .stock-table th,.stock-table td{padding:8px 8px;}
+      .stock-table th:nth-child(2){display:none;} /* hide Shares header */
+      .stock-table td:nth-child(2){display:none;} /* hide Shares cells */
+      .td-name,.week52-wrap{display:none;}
+      .td-symbol{font-size:13px;}
+      .td-price{font-size:12px;}
+      .td-value{font-size:13px;}
+      .td-change{font-size:11px;}
+
+      /* Status bar: compact row */
+      .status-bar{flex-wrap:wrap;gap:6px;margin-top:6px;}
+      .status-right{gap:8px;}
+      .currency-sel{font-size:10px;padding:3px 6px;}
+      .btn-edit{padding:4px 10px;font-size:10px;}
+    }
   </style>
 </head>
 <body>
@@ -385,11 +452,13 @@ function fmtDollar(usd) {
   var neg = v < 0, abs = Math.abs(v), sym = getSym();
   var s;
   if (activeCurrency === 'INR') {
-    if (abs >= 10000000) s = (abs/10000000).toFixed(2) + ' Cr';
-    else if (abs >= 100000) s = (abs/100000).toFixed(2) + ' L';
-    else s = abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+    if (abs >= 10000000) s = +((abs/10000000).toFixed(1)) + ' Cr';
+    else if (abs >= 100000) s = +((abs/100000).toFixed(1)) + ' L';
+    else s = Math.round(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
   } else {
-    var parts = abs.toFixed(2).split('.');
+    // Remove trailing .00 — keep .5x cents only if non-zero
+    var raw = abs.toFixed(2).replace(/\.00$/, '');
+    var parts = raw.split('.');
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
     s = parts.join('.');
   }
