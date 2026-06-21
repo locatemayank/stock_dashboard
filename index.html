@@ -164,6 +164,7 @@
     .td-change.flat { color:var(--text-sec); }
     .td-loading { color:var(--text-dim);font-size:11px;font-style:italic; }
     .td-error   { color:var(--accent-red);font-size:10px; }
+    .chg-short  { display:none; } /* shown only in portrait via media query */
     /* 52-week bar */
     .week52-wrap { display:flex;align-items:center;gap:4px;margin-top:4px; }
     .week52-edge { font-size:8px;color:var(--text-dim);letter-spacing:.04em;width:12px;text-align:center;flex-shrink:0; }
@@ -206,10 +207,11 @@
         padding:12px 14px 16px; gap:2px;
       }
 
-      /* Top strip: [Time | Temp] then [Day Date] */
-      .top-strip{flex-wrap:wrap;padding-bottom:8px;margin-bottom:6px;}
-      .top-time-wrap{flex:1;order:1;}
-      .top-right{order:2;text-align:right;flex-shrink:0;}
+      /* Top strip: [Time | Temp] then [Day Date] — overflow contained */
+      .top-strip{flex-wrap:wrap;padding-bottom:8px;margin-bottom:6px;overflow:hidden;}
+      .top-time-wrap{flex:1;order:1;min-width:0;overflow:hidden;}
+      .top-right{order:2;text-align:right;min-width:0;max-width:45%;}
+      .top-temp{white-space:nowrap;}
       .top-center{
         order:3;width:100%;display:flex;align-items:baseline;gap:10px;
         border-top:1px solid rgba(255,255,255,.07);padding-top:6px;margin-top:6px;
@@ -242,7 +244,7 @@
 
       /* Stock table: compact, natural height (page scrolls) */
       .stock-table-wrap{border-radius:14px;overflow:hidden;}
-      .stock-table th,.stock-table td{padding:8px 8px;}
+      .stock-table th,.stock-table td{padding:8px 6px;}
       .stock-table th:nth-child(2){display:none;} /* hide Shares header */
       .stock-table td:nth-child(2){display:none;} /* hide Shares cells */
       .td-name,.week52-wrap{display:none;}
@@ -250,6 +252,9 @@
       .td-price{font-size:12px;}
       .td-value{font-size:13px;}
       .td-change{font-size:11px;}
+      /* Portrait: show % only in change column, hide full amount */
+      .chg-full{display:none;}
+      .chg-short{display:inline;}
 
       /* Status bar: compact row */
       .status-bar{flex-wrap:wrap;gap:6px;margin-top:6px;}
@@ -447,18 +452,30 @@ function getSym() {
   return c ? c.symbol : '$';
 }
 
+// fmtDollar: integer rounding — for portfolio totals, position values, dividends
 function fmtDollar(usd) {
   var v = usd * getRate();
   var neg = v < 0, abs = Math.abs(v), sym = getSym();
   var s;
   if (activeCurrency === 'INR') {
-    if (abs >= 10000000) s = +((abs/10000000).toFixed(1)) + ' Cr';
-    else if (abs >= 100000) s = +((abs/100000).toFixed(1)) + ' L';
+    if (abs >= 10000000) s = (abs/10000000).toFixed(1).replace(/\.0$/, '') + ' Cr';
+    else if (abs >= 100000) s = (abs/100000).toFixed(1).replace(/\.0$/, '') + ' L';
     else s = Math.round(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
   } else {
-    // Remove trailing .00 — keep .5x cents only if non-zero
-    var raw = abs.toFixed(2).replace(/\.00$/, '');
-    var parts = raw.split('.');
+    s = Math.round(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  }
+  return (neg?'-':'') + sym + s;
+}
+
+// fmtPrice: 2 decimal places — only for per-share stock prices
+function fmtPrice(usd) {
+  var v = usd * getRate();
+  var neg = v < 0, abs = Math.abs(v), sym = getSym();
+  var s;
+  if (activeCurrency === 'INR') {
+    s = Math.round(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  } else {
+    var parts = abs.toFixed(2).split('.');
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
     s = parts.join('.');
   }
@@ -679,9 +696,12 @@ function renderTable() {
     else if(pd.error){ priceStr='<span class="td-error">Error</span>';valueStr='<span class="td-error">--</span>';changeStr='--';changeCls='flat';nameStr='Unable to fetch'; }
     else {
       var v=p.shares*pd.price, chg=p.shares*pd.change;
-      priceStr=fmtDollar(pd.price); valueStr=fmtDollar(v);
+      priceStr=fmtPrice(pd.price); valueStr=fmtDollar(v);
       var sign=chg>=0?'&#9650;':'&#9660;';
-      changeStr=sign+' '+fmtShort(chg)+' ('+(pd.changePct>=0?'+':'')+pd.changePct.toFixed(2)+'%)';
+      var pctStr=(pd.changePct>=0?'+':'')+pd.changePct.toFixed(2)+'%';
+      // chg-full shown in landscape; chg-short (% only) shown in portrait to prevent overflow
+      changeStr='<span class="chg-full">'+sign+'&nbsp;'+fmtShort(chg)+'&nbsp;('+pctStr+')</span>'
+               +'<span class="chg-short">'+sign+'&nbsp;'+pctStr+'</span>';
       changeCls=chg>0.001?'up':(chg<-0.001?'down':'flat');
       nameStr=pd.name;
     }
