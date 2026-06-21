@@ -172,6 +172,16 @@
     .rat-hold  { background:rgba(255,238,88,.08);border:1px solid rgba(255,238,88,.2);color:#fff176; }
     .rat-sell  { background:rgba(255,183,77,.1);border:1px solid rgba(255,183,77,.25);color:var(--accent-warm); }
     .rat-ssell { background:rgba(239,83,80,.1);border:1px solid rgba(239,83,80,.25);color:var(--accent-red); }
+    /* Rating change indicator (shown when rating upgrades/downgrades) */
+    .rat-chg { font-size:8px; letter-spacing:.04em; display:block; margin-top:1px; }
+    .rat-chg-up   { color:var(--accent-green); }
+    .rat-chg-down { color:var(--accent-red); }
+    /* Portfolio distribution line */
+    .pf-distrib { font-size:10px; letter-spacing:.06em; margin-top:6px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center; }
+    .pf-distrib .d-up   { color:var(--accent-green); font-weight:600; }
+    .pf-distrib .d-hold { color:#fff176; font-weight:600; }
+    .pf-distrib .d-down { color:var(--accent-red); font-weight:600; }
+    .pf-distrib .d-sep  { color:var(--text-dim); }
     /* 52-week bar */
     .week52-wrap { display:flex;align-items:center;gap:4px;margin-top:4px; }
     .week52-edge { font-size:8px;color:var(--text-dim);letter-spacing:.04em;width:12px;text-align:center;flex-shrink:0; }
@@ -384,7 +394,12 @@
         <span class="pf-meta-label">Annual Div</span>
         <span class="pf-meta-val" id="pfDiv">--</span>
       </div>
+      <div class="pf-meta-chip">
+        <span class="pf-meta-label">&#9733; Consensus</span>
+        <span class="pf-meta-val" id="pfConsensus">--</span>
+      </div>
     </div>
+    <div class="pf-distrib" id="pfDistrib"></div>
   </div>
 
   <!-- STOCK TABLE -->
@@ -444,7 +459,9 @@ function savePortfolio(p){ localStorage.setItem(STORAGE_KEY,JSON.stringify(p)); 
 var portfolio   = [];
 var priceData   = {};  // {SYM: {price,change,changePct,name,state,error}}
 var metricsData = {};  // {SYM: {high52,low52,beta,divYield}}
-var ratingsData = {};  // {SYM: {label,cls} e.g. {label:'BUY',cls:'rat-buy'}}
+var ratingsData     = {};  // {SYM: {label,cls,score}}
+var prevRatingsData = {};  // previous ratings for change detection
+var ratingChanges   = {};  // {SYM: {fromLabel, toLabel, dir:'up'|'down'}}
 var indexPrices = {};  // {SPY:{changePct},QQQ:{changePct},DIA:{changePct}}
 var finnhubKey  = '';
 var fetchTimer  = null;
@@ -581,11 +598,13 @@ function calcRatingFromData(data) {
   var total = (r.buy||0) + (r.hold||0) + (r.sell||0) + (r.strongBuy||0) + (r.strongSell||0);
   if (!total) return null;
   var score = ((r.strongBuy||0)*5 + (r.buy||0)*4 + (r.hold||0)*3 + (r.sell||0)*2 + (r.strongSell||0)*1) / total;
-  if (score >= 4.2) return {label:'S.BUY', cls:'rat-sbuy'};
-  if (score >= 3.5) return {label:'BUY',   cls:'rat-buy'};
-  if (score >= 2.5) return {label:'HOLD',  cls:'rat-hold'};
-  if (score >= 1.8) return {label:'SELL',  cls:'rat-sell'};
-  return {label:'S.SELL', cls:'rat-ssell'};
+  var label, cls;
+  if (score >= 4.2) { label='S.BUY'; cls='rat-sbuy'; }
+  else if (score >= 3.5) { label='BUY';   cls='rat-buy'; }
+  else if (score >= 2.5) { label='HOLD';  cls='rat-hold'; }
+  else if (score >= 1.8) { label='SELL';  cls='rat-sell'; }
+  else                   { label='S.SELL'; cls='rat-ssell'; }
+  return {label:label, cls:cls, score:score};
 }
 
 function fetchOneRecommendation(symbol) {
@@ -595,7 +614,22 @@ function fetchOneRecommendation(symbol) {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var rating = calcRatingFromData(data);
-      if (rating) { ratingsData[symbol] = rating; renderTable(); }
+      if (rating) {
+        var prev = ratingsData[symbol];
+        // ── Change detection (#5) ──────────────────────────────
+        if (prev && prev.label !== rating.label) {
+          ratingChanges[symbol] = {
+            fromLabel: prev.label,
+            toLabel:   rating.label,
+            dir:       rating.score > prev.score ? 'up' : 'down'
+          };
+          // Clear the change indicator after 30 min (next cycle)
+          setTimeout(function() { delete ratingChanges[symbol]; renderTable(); }, 30*60*1000);
+        }
+        ratingsData[symbol] = rating;
+        renderTable();
+        renderConsensus(); // update score + distribution
+      }
     }).catch(function(){});
 }
 
@@ -605,6 +639,58 @@ function fetchAllRecommendations() {
   portfolio.forEach(function(p, idx) {
     setTimeout(function() { fetchOneRecommendation(p.symbol); }, idx * 200);
   });
+}
+
+// ── Portfolio consensus + distribution (#1 + #4) ──────────────────
+function calcPortfolioConsensus() {
+  var totalVal=0, wScore=0, has=false;
+  portfolio.forEach(function(p) {
+    var pd=priceData[p.symbol], rat=ratingsData[p.symbol];
+    if(pd&&pd.price&&!pd.error&&rat&&rat.score){
+      var val=p.shares*pd.price; totalVal+=val; wScore+=val*rat.score; has=true;
+    }
+  });
+  return (has&&totalVal>0) ? wScore/totalVal : null;
+}
+
+function calcRatingDistribution() {
+  var up=0, hold=0, down=0;
+  portfolio.forEach(function(p) {
+    var rat=ratingsData[p.symbol]; if(!rat) return;
+    if(rat.label==='S.BUY'||rat.label==='BUY') up++;
+    else if(rat.label==='HOLD') hold++;
+    else down++;
+  });
+  return {up:up, hold:hold, down:down, total:up+hold+down};
+}
+
+function renderConsensus() {
+  // Consensus chip (#1)
+  var score = calcPortfolioConsensus();
+  var consEl = document.getElementById('pfConsensus');
+  if(consEl){
+    if(score===null){ consEl.textContent='--'; consEl.className='pf-meta-val'; }
+    else {
+      var lbl, ccls;
+      if(score>=4.2){lbl='Strong Buy';ccls='rat-sbuy';}
+      else if(score>=3.5){lbl='Bullish';ccls='rat-buy';}
+      else if(score>=2.5){lbl='Neutral';ccls='rat-hold';}
+      else if(score>=1.8){lbl='Bearish';ccls='rat-sell';}
+      else{lbl='Strong Sell';ccls='rat-ssell';}
+      consEl.textContent=score.toFixed(1)+' \u00b7 '+lbl;
+      consEl.className='pf-meta-val '+ccls;
+    }
+  }
+  // Distribution line (#4)
+  var dist = calcRatingDistribution();
+  var distEl = document.getElementById('pfDistrib');
+  if(distEl&&dist.total>0){
+    var parts=[];
+    if(dist.up>0)   parts.push('<span class="d-up">&#9650; '+dist.up+' Buy</span>');
+    if(dist.hold>0) parts.push('<span class="d-hold">&#9670; '+dist.hold+' Hold</span>');
+    if(dist.down>0) parts.push('<span class="d-down">&#9660; '+dist.down+' Sell</span>');
+    distEl.innerHTML=parts.join('<span class="d-sep"> &bull; </span>');
+  } else if(distEl){ distEl.innerHTML=''; }
 }
 
 // ── Finnhub metrics: 52W, beta, dividend ──
@@ -772,7 +858,12 @@ function renderTable() {
       nameStr=pd.name;
     }
     var rat = ratingsData[p.symbol];
-    var ratHtml = rat ? '<div class="rat-badge '+rat.cls+'">'+rat.label+'</div>' : '';
+    var chg = ratingChanges[p.symbol];
+    var ratHtml = rat
+      ? '<div class="rat-badge '+rat.cls+'">'+rat.label
+        +(chg?'<span class="rat-chg rat-chg-'+chg.dir+'">'+(chg.dir==='up'?'\u2191':'\u2193')+' was '+chg.fromLabel+'</span>':'')
+        +'</div>'
+      : '';
     html+='<tr>'
       +'<td><div class="td-symbol">'+p.symbol+'</div><div class="td-name">'+nameStr+'</div>'
       +(pd&&pd.price&&!pd.error?render52wBar(p.symbol,pd.price):'')
@@ -850,6 +941,7 @@ function reRenderAll() {
   updatePortfolioTotal();
   renderPfMeta();
   renderTable();
+  renderConsensus();
 }
 
 function animateVal(el, from, to, dur) {
