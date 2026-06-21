@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#00e5ff" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Stocks" />
+  <link rel="manifest" href="stock_manifest.json" />
+  <link rel="icon" href="stock_icon.svg" type="image/svg+xml" />
   <title>Stock Dashboard</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;900&family=Orbitron:wght@400;700;900&display=swap');
@@ -457,10 +464,13 @@ function fetchFinnhubMetrics(symbol) {
     .then(function(d) {
       if (d && d.metric) {
         metricsData[symbol] = {
-          high52:   d.metric['52WeekHigh']                  || 0,
-          low52:    d.metric['52WeekLow']                   || 0,
-          beta:     d.metric.beta                           || null,
-          divYield: d.metric.dividendYieldIndicatedAnnual   || 0
+          high52:      d.metric['52WeekHigh']                || 0,
+          low52:       d.metric['52WeekLow']                 || 0,
+          beta:        (d.metric.beta !== null && d.metric.beta !== undefined) ? d.metric.beta : null,
+          divPerShare: d.metric.dividendPerShareAnnual
+                       || d.metric.dividendPerShareTTM       || 0,
+          divYield:    d.metric.dividendYieldIndicatedAnnual
+                       || d.metric.dividendYield5Y           || 0
         };
       }
     }).catch(function(){});
@@ -555,14 +565,19 @@ function calcPortfolioBeta() {
 }
 
 function calcAnnualDividends() {
-  var total=0;
+  var total=0, hasData=false;
   portfolio.forEach(function(p){
     var pd=priceData[p.symbol], md=metricsData[p.symbol];
-    if(pd&&pd.price&&!pd.error&&md&&md.divYield>0){
-      total += p.shares * pd.price * (md.divYield/100);
+    if(md) hasData=true;
+    if(pd&&pd.price&&!pd.error&&md){
+      if(md.divPerShare>0){
+        total += p.shares * md.divPerShare;         // e.g. 100sh × $0.98/sh/yr
+      } else if(md.divYield>0){
+        total += p.shares * pd.price * (md.divYield/100); // fallback: yield%
+      }
     }
   });
-  return total;
+  return {total:total, hasData:hasData};
 }
 
 function render52wBar(symbol, price) {
@@ -654,9 +669,13 @@ function renderPfMeta() {
       betaEl.className='pf-meta-val '+cls;
     }
   }
-  var divVal = calcAnnualDividends();
-  var divEl  = document.getElementById('pfDiv');
-  if(divEl){ divEl.textContent = divVal>0.01 ? fmtDollar(divVal)+'/yr' : '--'; }
+  var divResult = calcAnnualDividends();
+  var divEl = document.getElementById('pfDiv');
+  if(divEl){
+    // Show dollar amount when Finnhub data present (even $0 for non-dividend stocks)
+    // '--' means no API key entered yet
+    divEl.textContent = divResult.hasData ? fmtDollar(divResult.total)+'/yr' : '--';
+  }
 }
 
 function updateMarketStatus(state) {
@@ -835,6 +854,15 @@ setInterval(fetchExchangeRates, 60*60*1000); // refresh rates hourly
 var saved = loadPortfolio();
 if (saved && saved.length) { portfolio=saved; showDashboard(); }
 else { showSetup(false); addStockRow('AAPL',''); addStockRow('TSLA',''); }
+
+// ── PWA Service Worker ──────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('stock_sw.js')
+      .then(function(r){ console.log('SW registered:', r.scope); })
+      .catch(function(e){ console.warn('SW failed:', e); });
+  });
+}
 </script>
 </body>
 </html>
