@@ -3,392 +3,526 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#00e5ff" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Stocks" />
-  <link rel="manifest" href="stock_manifest.json" />
-  <link rel="icon" href="stock_icon.svg" type="image/svg+xml" />
-  <title>Stock Dashboard</title>
+  <title>Dashboard</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;900&family=Orbitron:wght@400;700;900&display=swap');
 
-    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg-card:      rgba(255,255,255,0.04);
-      --accent-blue:  #4fc3f7;
-      --accent-cyan:  #00e5ff;
-      --accent-warm:  #ffb74d;
-      --accent-green: #69f0ae;
-      --accent-red:   #ef5350;
-      --text-primary: #e8eaf6;
-      --text-sec:     #90a4ae;
-      --text-dim:     #546e7a;
+      --bg-primary:  #0a0e1a;
+      --bg-card:     rgba(255,255,255,0.04);
+      --accent-blue:   #4fc3f7;
+      --accent-cyan:   #00e5ff;
+      --accent-purple: #b39ddb;
+      --accent-warm:   #ffb74d;
+      --accent-green:  #69f0ae;
+      --text-primary:  #e8eaf6;
+      --text-secondary:#90a4ae;
+      --text-dim:      #546e7a;
+      --glow-cyan:  rgba(0,229,255,0.3);
+      --glow-warm:  rgba(255,183,77,0.35);
+      --glow-blue:  rgba(79,195,247,0.4);
     }
 
-    html, body { width:100%; height:100%; overflow:hidden; background:#02030c; }
+    html, body { width:100%; height:100%; overflow:hidden; background:#030308; }
+
     body {
-      font-family:'Inter',sans-serif; display:flex; align-items:center; justify-content:center;
-      min-height:100vh; position:relative; transition:background-color 60s ease;
+      font-family:'Inter',sans-serif;
+      display:flex; align-items:center; justify-content:center;
+      min-height:100vh; position:relative;
+      transition: background-color 60s ease, filter 1.5s ease;
     }
 
-    /* ── Background ── */
-    #bgSky { position:fixed; inset:0; z-index:-1; pointer-events:none;
-      background:radial-gradient(ellipse at 35% 20%,#0d1535 0%,#03040e 100%); }
-    .bg-orb { position:fixed; border-radius:50%; filter:blur(80px); opacity:.22;
-      animation:orbFloat 20s ease-in-out infinite; pointer-events:none; z-index:0; }
-    .bg-orb-1 { width:700px;height:700px;background:radial-gradient(circle,#0f1660,transparent);top:-220px;left:-180px; }
-    .bg-orb-2 { width:600px;height:600px;background:radial-gradient(circle,#003c50,transparent);bottom:-180px;right:-120px;animation-delay:-8s; }
-    .bg-orb-3 { width:500px;height:500px;background:radial-gradient(circle,#300042,transparent);top:40%;left:50%;transform:translate(-50%,-50%);animation-delay:-14s; }
-    @keyframes orbFloat { 0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(30px,-20px) scale(1.05);}66%{transform:translate(-20px,30px) scale(0.95);} }
-    .bg-grid { position:fixed;inset:0;background-image:linear-gradient(rgba(79,195,247,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(79,195,247,.025) 1px,transparent 1px);background-size:60px 60px;z-index:0;pointer-events:none; }
-    .scanline { position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px);z-index:1;pointer-events:none; }
+    body.night-dim { filter:brightness(0.15) saturate(0.6); }
+    body.night-dim.wake { filter:brightness(1) saturate(1); }
 
-    /* ════ SETUP MODAL ════ */
-    .setup-overlay { position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center; }
-    .setup-card { background:rgba(12,18,40,.96);border:1px solid rgba(79,195,247,.2);border-radius:24px;padding:36px 40px;width:min(540px,92vw);max-height:88vh;overflow-y:auto;box-shadow:0 8px 60px rgba(0,0,0,.6); }
-    .setup-title { font-family:'Orbitron',monospace;font-size:22px;font-weight:700;color:var(--accent-cyan);margin-bottom:6px;letter-spacing:.05em; }
-    .setup-hint { font-size:13px;color:var(--text-sec);margin-bottom:20px;letter-spacing:.04em; }
-    .setup-section-label { font-size:9px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--text-dim);margin:16px 0 8px; }
-    .stock-row { display:flex;align-items:center;gap:10px;margin-bottom:10px; }
-    .stock-row input { background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 14px;color:var(--text-primary);font-family:'Orbitron',monospace;font-size:14px;outline:none;transition:border-color .2s; }
-    .stock-row input:focus { border-color:rgba(79,195,247,.5); }
-    .stock-row .inp-ticker { width:110px;text-transform:uppercase;letter-spacing:.1em; }
-    .stock-row .inp-shares { width:100px; }
-    .stock-row .inp-shares::placeholder { font-family:'Inter',sans-serif;font-size:12px; }
-    .stock-row .inp-label { font-size:11px;color:var(--text-dim);white-space:nowrap; }
-    .btn-remove { background:rgba(239,83,80,.12);border:1px solid rgba(239,83,80,.2);border-radius:8px;color:var(--accent-red);font-size:16px;width:34px;height:34px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .2s; }
-    .btn-remove:hover { background:rgba(239,83,80,.25); }
-    .btn-add-stock { background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.2);border-radius:10px;color:var(--accent-blue);font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;margin-top:4px;letter-spacing:.06em;transition:background .2s; }
-    .btn-add-stock:hover { background:rgba(79,195,247,.16); }
-    .api-row { display:flex;align-items:center;gap:10px;margin-bottom:6px; }
-    .api-row input { flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:10px 14px;color:var(--text-primary);font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:border-color .2s; }
-    .api-row input:focus { border-color:rgba(79,195,247,.5); }
-    .api-link { font-size:11px;color:var(--accent-blue);text-decoration:none;white-space:nowrap; }
-    .api-link:hover { text-decoration:underline; }
-    .api-note { font-size:11px;color:var(--text-dim);margin-top:2px; }
-    .setup-error { font-size:12px;color:var(--accent-red);margin-top:12px;display:none; }
-    .setup-footer { margin-top:22px;display:flex;justify-content:flex-end; }
-    .btn-save { background:linear-gradient(135deg,rgba(0,229,255,.18),rgba(79,195,247,.22));border:1px solid rgba(79,195,247,.4);border-radius:12px;color:var(--accent-cyan);font-family:'Orbitron',monospace;font-size:13px;font-weight:700;letter-spacing:.1em;padding:12px 28px;cursor:pointer;transition:background .2s,box-shadow .2s; }
-    .btn-save:hover { box-shadow:0 0 20px rgba(0,229,255,.25); }
+    .night-banner {
+      position:fixed; top:0; left:0; right:0;
+      background:rgba(0,0,0,0.7); color:#546e7a;
+      font-size:11px; font-weight:500; letter-spacing:.2em; text-transform:uppercase;
+      text-align:center; padding:6px; z-index:200; display:none;
+    }
+    body.night-dim .night-banner { display:block; }
+    body.night-dim.wake .night-banner { display:none; }
 
-    /* ════ MAIN DASHBOARD ════ */
-    .dashboard { position:relative;z-index:2;width:100vw;height:100vh;display:grid;grid-template-rows:auto auto auto 1fr auto;padding:18px 40px 12px;gap:0; }
+    /* ══════════════════════════════════════════
+       DYNAMIC SKY SYSTEM
+    ══════════════════════════════════════════ */
 
-    /* ── Top strip ── */
-    .top-strip { display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.07); }
-    .top-time-wrap { display:flex;align-items:baseline;gap:3px; }
-    .top-time { font-family:'Orbitron',monospace;font-size:clamp(58px,8.5vw,115px);font-weight:900;letter-spacing:.04em;line-height:1;background:linear-gradient(135deg,#e8f4fd,var(--accent-cyan) 50%,var(--accent-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-variant-numeric:tabular-nums; }
-    .top-colon { font-family:'Orbitron',monospace;font-size:clamp(58px,8.5vw,115px);font-weight:900;color:var(--accent-cyan);-webkit-text-fill-color:var(--accent-cyan);animation:colonBlink 1s step-start infinite;margin:0 -1px; }
-    @keyframes colonBlink { 0%,100%{opacity:1;}50%{opacity:.08;} }
-    .top-ampm { font-family:'Orbitron',monospace;font-size:clamp(17px,2.2vw,30px);color:var(--accent-blue);opacity:.8;letter-spacing:.12em;margin-bottom:6px; }
-    .top-digit-group { display:flex;align-items:baseline; }
-    .top-digit-group .top-time { letter-spacing:0; }
-    .top-center { text-align:center; }
-    .top-dayname { font-family:'Inter',sans-serif;font-size:clamp(20px,3vw,42px);font-weight:200;letter-spacing:.3em;text-transform:uppercase;color:var(--text-primary); }
-    .top-datestr { font-family:'Orbitron',monospace;font-size:clamp(12px,1.6vw,22px);letter-spacing:.18em;color:var(--accent-blue);opacity:.75;margin-top:4px; }
-    .top-right { text-align:right; }
-    .top-temp { font-family:'Orbitron',monospace;font-size:clamp(30px,4.5vw,62px);font-weight:700;color:var(--accent-warm);text-shadow:0 0 20px rgba(255,183,77,.45); }
-    .top-condition { font-size:13px;color:var(--text-sec);margin-top:2px;letter-spacing:.06em; }
-    .top-location { font-size:10px;color:var(--text-dim);margin-top:2px;letter-spacing:.06em;cursor:pointer; }
-    .top-location:hover { color:var(--accent-blue); }
+    /* Deep sky gradient layer — transitions between time themes */
+    #bgSky {
+      position:fixed; inset:0; z-index:-1; pointer-events:none;
+      background:radial-gradient(ellipse at 40% 25%, #0e0822 0%, #030308 100%);
+      transition:background 50s ease;
+    }
 
-    /* ── Market strip (indices + F&G) ── */
-    .market-strip { display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 0 10px;border-bottom:1px solid rgba(255,255,255,.05);margin-bottom:8px; }
-    .index-pills { display:flex;gap:8px;flex-wrap:wrap; }
-    .index-pill { display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:4px 14px; }
-    .idx-label { font-size:10px;letter-spacing:.08em;color:var(--text-dim);text-transform:uppercase; }
-    .idx-chg { font-family:'Orbitron',monospace;font-size:12px;font-weight:700; }
-    .idx-up   { color:var(--accent-green); }
-    .idx-down { color:var(--accent-red); }
-    .idx-flat { color:var(--text-sec); }
-    .mkt-right { display:flex;align-items:center;gap:10px; }
-    /* Fear & Greed badge */
-    .fng-badge { display:inline-flex;align-items:center;gap:6px;border-radius:20px;padding:4px 14px;font-size:12px;font-weight:600;letter-spacing:.06em;border:1px solid; }
-    .fng-efear  { background:rgba(183,28,28,.12);  border-color:rgba(183,28,28,.3);  color:#ef5350; }
-    .fng-fear   { background:rgba(255,152,0,.1);   border-color:rgba(255,152,0,.25); color:#ff9800; }
-    .fng-neutral{ background:rgba(255,238,88,.08); border-color:rgba(255,238,88,.2); color:#fff176; }
-    .fng-greed  { background:rgba(105,240,174,.1); border-color:rgba(105,240,174,.2);color:var(--accent-green); }
-    .fng-egreed { background:rgba(0,230,118,.1);   border-color:rgba(0,230,118,.25); color:#00e676; }
-    .fng-unknown{ background:rgba(144,164,174,.06);border-color:rgba(144,164,174,.15);color:var(--text-dim); }
+    /* Horizon glow */
+    #horizonGlow {
+      position:fixed; bottom:0; left:0; right:0; height:40%;
+      z-index:0; pointer-events:none;
+      background:linear-gradient(to top, rgba(200,60,10,0.3), transparent);
+      opacity:0; transition:opacity 40s ease, background 40s ease;
+    }
 
-    /* ── Portfolio section ── */
-    .portfolio-section { display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 0 10px; }
-    .pf-label { font-size:10px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px; }
-    .pf-total { font-family:'Orbitron',monospace;font-size:clamp(44px,8vw,110px);font-weight:900;letter-spacing:.02em;line-height:1;color:var(--text-primary);text-shadow:0 0 40px rgba(79,195,247,.3);transition:color .5s ease; }
-    .pf-total.up   { color:#a5d6a7;text-shadow:0 0 40px rgba(105,240,174,.3); }
-    .pf-total.down { color:#ef9a9a;text-shadow:0 0 40px rgba(239,83,80,.25); }
-    .pf-change { font-size:clamp(13px,1.8vw,20px);font-weight:500;margin-top:4px;letter-spacing:.05em; }
-    .pf-change.up   { color:var(--accent-green); }
-    .pf-change.down { color:var(--accent-red); }
-    .pf-change.flat { color:var(--text-sec); }
-    /* Beta + Dividend row */
-    .pf-meta { display:flex;align-items:center;gap:16px;margin-top:6px;flex-wrap:wrap;justify-content:center; }
-    .pf-meta-chip { display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:3px 12px; }
-    .pf-meta-label { font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim); }
-    .pf-meta-val { font-family:'Orbitron',monospace;font-size:13px;font-weight:700; }
-    .beta-low  { color:var(--accent-green); }
-    .beta-mod  { color:#fff176; }
-    .beta-high { color:var(--accent-warm); }
-    .beta-vhigh{ color:var(--accent-red); }
-    /* Market status */
-    .mkt-badge { display:inline-flex;align-items:center;gap:5px;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:600;letter-spacing:.12em; }
-    .mkt-open  { background:rgba(105,240,174,.1);border:1px solid rgba(105,240,174,.25);color:var(--accent-green); }
-    .mkt-pre   { background:rgba(255,238,88,.08);border:1px solid rgba(255,238,88,.2);color:#fff176; }
-    .mkt-after { background:rgba(179,157,219,.08);border:1px solid rgba(179,157,219,.2);color:#b39ddb; }
-    .mkt-closed{ background:rgba(144,164,174,.06);border:1px solid rgba(144,164,174,.15);color:var(--text-dim); }
-    .mkt-dot { width:6px;height:6px;border-radius:50%;background:currentColor;animation:sPulse 2s ease-in-out infinite; }
-    @keyframes sPulse { 0%,100%{opacity:1;}50%{opacity:.3;} }
+    /* Star field */
+    #starField {
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      opacity:0.85; transition:opacity 40s ease;
+    }
+    .star-dot {
+      position:absolute; border-radius:50%; background:#fff;
+      animation:starTwinkle var(--sd) ease-in-out infinite;
+      animation-delay:var(--dl);
+    }
+    @keyframes starTwinkle {
+      0%,100%{ opacity:var(--mx); transform:scale(1); }
+      50%    { opacity:calc(var(--mx)*0.15); transform:scale(0.5); }
+    }
 
-    /* ── Stock table ── */
-    .stock-table-wrap { overflow-y:auto;background:var(--bg-card);border:1px solid rgba(255,255,255,.06);border-radius:18px;backdrop-filter:blur(10px);overflow:hidden; }
-    .stock-table { width:100%;border-collapse:collapse; }
-    .stock-table thead tr { background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.07); }
-    .stock-table th { font-size:9px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--text-dim);padding:9px 16px;text-align:right; }
-    .stock-table th:first-child { text-align:left; }
-    .stock-table tbody tr { border-bottom:1px solid rgba(255,255,255,.04);transition:background .2s; }
-    .stock-table tbody tr:last-child { border-bottom:none; }
-    .stock-table tbody tr:hover { background:rgba(255,255,255,.03); }
-    .stock-table td { padding:10px 16px;text-align:right;vertical-align:middle; }
-    .stock-table td:first-child { text-align:left; }
-    .td-symbol { font-family:'Orbitron',monospace;font-size:14px;font-weight:700;color:var(--accent-cyan);letter-spacing:.08em; }
-    .td-name { font-size:10px;color:var(--text-dim);margin-top:1px; }
-    .td-shares { font-family:'Orbitron',monospace;font-size:13px;color:var(--text-sec); }
-    .td-price  { font-family:'Orbitron',monospace;font-size:13px;color:var(--text-primary); }
-    .td-value  { font-family:'Orbitron',monospace;font-size:14px;font-weight:700;color:var(--text-primary); }
-    .td-change { font-size:12px;font-weight:600; }
-    .td-change.up   { color:var(--accent-green); }
-    .td-change.down { color:var(--accent-red); }
-    .td-change.flat { color:var(--text-sec); }
-    .td-loading { color:var(--text-dim);font-size:11px;font-style:italic; }
-    .td-error   { color:var(--accent-red);font-size:10px; }
-    .chg-short  { display:none; } /* shown only in portrait via media query */
-    /* 52-week bar */
-    .week52-wrap { display:flex;align-items:center;gap:4px;margin-top:4px; }
-    .week52-edge { font-size:8px;color:var(--text-dim);letter-spacing:.04em;width:12px;text-align:center;flex-shrink:0; }
-    .week52-bar  { flex:1;height:3px;background:rgba(255,255,255,.1);border-radius:2px;max-width:90px;position:relative; }
-    .week52-fill { height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent-green),var(--accent-cyan));transition:width .5s ease; }
-    .week52-pos  { font-size:8px;color:var(--text-dim);white-space:nowrap; }
-    .stock-empty { text-align:center;padding:28px;color:var(--text-dim);font-size:14px; }
+    /* Day field — animated clouds and birds (day/sunrise/sunset only) */
+    #dayField {
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      opacity:0; transition:opacity 40s ease;
+    }
+    .cloud {
+      position:absolute; border-radius:50%;
+      filter:blur(var(--cb,25px));
+      background:rgba(220,235,255,var(--ca,0.07));
+      animation:cloudDrift var(--cd,130s) linear infinite;
+      animation-delay:var(--cdelay,0s);
+    }
+    @keyframes cloudDrift {
+      from { transform:translateX(115vw); }
+      to   { transform:translateX(-130vw); }
+    }
+    .bird-group {
+      position:absolute; display:flex; align-items:flex-end;
+      animation:birdFly var(--bd,70s) linear infinite;
+      animation-delay:var(--bdelay,0s);
+    }
+    @keyframes birdFly {
+      0%   { transform:translateX(112vw) translateY(0); }
+      30%  { transform:translateX(60vw)  translateY(-2.5vh); }
+      70%  { transform:translateX(8vw)   translateY(1.5vh); }
+      100% { transform:translateX(-115vw) translateY(0); }
+    }
+    .bird {
+      display:inline-block; flex-shrink:0;
+      animation:birdFlap var(--bf,0.75s) ease-in-out infinite alternate;
+      animation-delay:var(--bfd,0s);
+    }
+    @keyframes birdFlap {
+      from { transform:scaleY(1);     }
+      to   { transform:scaleY(-0.22); }
+    }
 
-    /* ── Status bar ── */
-    .status-bar { display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:0 2px; }
-    .status-left { display:flex;align-items:center;gap:7px;font-size:9px;letter-spacing:.15em;color:var(--text-dim);text-transform:uppercase; }
-    .status-dot { width:5px;height:5px;background:var(--accent-green);border-radius:50%;box-shadow:0 0 7px var(--accent-green);animation:sPulse 2s ease-in-out infinite; }
-    .status-right { display:flex;align-items:center;gap:10px; }
-    .last-update { font-size:9px;color:var(--text-dim);letter-spacing:.1em; }
-    /* Currency selector */
-    .currency-sel { background:rgba(79,195,247,.07);border:1px solid rgba(79,195,247,.18);border-radius:8px;color:var(--accent-blue);font-family:'Orbitron',monospace;font-size:11px;font-weight:600;padding:4px 8px;cursor:pointer;outline:none;letter-spacing:.06em;transition:background .2s; }
-    .currency-sel option { background:#0c1228;color:var(--text-primary);font-family:'Inter',sans-serif; }
-    .btn-edit { background:rgba(79,195,247,.07);border:1px solid rgba(79,195,247,.18);border-radius:10px;color:var(--accent-blue);font-size:11px;font-weight:500;padding:5px 14px;cursor:pointer;letter-spacing:.07em;transition:background .2s; }
-    .btn-edit:hover { background:rgba(79,195,247,.16); }
+    /* Aurora borealis */
+    #auroraWrap {
+      position:fixed; top:0; left:0; right:0; height:52%;
+      z-index:0; pointer-events:none; overflow:hidden;
+      opacity:0.55; transition:opacity 40s ease;
+    }
+    .aurora-band {
+      position:absolute; left:-10%; width:120%; border-radius:50%;
+      filter:blur(55px); opacity:0.4; transition:background 25s ease;
+    }
+    .ab1 { height:160px; top:-55px;
+      background:linear-gradient(90deg,transparent,#003870,#005040,transparent);
+      animation:auroraWave 13s ease-in-out infinite; }
+    .ab2 { height:140px; top:30px;
+      background:linear-gradient(90deg,transparent,#380060,#007058,transparent);
+      animation:auroraWave 17s ease-in-out infinite reverse; animation-delay:-5s; }
+    .ab3 { height:120px; top:85px;
+      background:linear-gradient(90deg,transparent,#004060,#580070,transparent);
+      animation:auroraWave 11s ease-in-out infinite; animation-delay:-8s; }
+    @keyframes auroraWave {
+      0%,100% { transform:translateX(-8%) scaleY(1);   }
+      50%      { transform:translateX(8%)  scaleY(1.6); }
+    }
 
-    /* Misc */
-    .fade-in { animation:fadeIn 1s ease forwards; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);} }
-    .spinner { display:inline-block;width:13px;height:13px;border:2px solid rgba(79,195,247,.2);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:5px; }
-    @keyframes spin { to{transform:rotate(360deg);} }
-    /* ── Tablet portrait / small tablet ── */
+    /* ── BG orbs — more opaque for prominent hue ── */
+    .bg-orb {
+      position:fixed; border-radius:50%; filter:blur(80px); opacity:.25;
+      animation:orbFloat 20s ease-in-out infinite; pointer-events:none; z-index:0;
+      transition:background 50s ease, opacity 50s ease;
+    }
+    .bg-orb-1 { width:700px;height:700px; background:radial-gradient(circle,#1a237e,transparent); top:-220px;left:-180px; }
+    .bg-orb-2 { width:600px;height:600px; background:radial-gradient(circle,#006064,transparent); bottom:-180px;right:-120px; animation-delay:-8s; }
+    .bg-orb-3 { width:500px;height:500px; background:radial-gradient(circle,#4a148c,transparent); top:40%;left:50%; transform:translate(-50%,-50%); animation-delay:-14s; }
+    @keyframes orbFloat {
+      0%,100%{transform:translate(0,0) scale(1);}
+      33%{transform:translate(30px,-20px) scale(1.05);}
+      66%{transform:translate(-20px,30px) scale(0.95);}
+    }
+    .bg-grid {
+      position:fixed; inset:0;
+      background-image:linear-gradient(rgba(79,195,247,.025) 1px,transparent 1px),
+                       linear-gradient(90deg,rgba(79,195,247,.025) 1px,transparent 1px);
+      background-size:60px 60px; z-index:0; pointer-events:none;
+    }
+    .scanline {
+      position:fixed; inset:0;
+      background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px);
+      z-index:1; pointer-events:none;
+    }
+
+    /* ── Dashboard grid ── */
+    .dashboard {
+      position:relative; z-index:2;
+      width:100vw; height:100vh;
+      display:grid;
+      grid-template-rows: 1fr auto auto auto auto;
+      grid-template-columns:1fr;
+      align-items:center; justify-items:center;
+      padding:24px 44px 14px; gap:0;
+    }
+
+    /* ── TIME ── */
+    .time-section { display:flex; align-items:center; justify-content:center; width:100%; }
+    .time-wrapper  { display:flex; align-items:flex-end; gap:10px; position:relative; }
+    .time-glow {
+      position:absolute; width:100%; height:100%;
+      background:radial-gradient(ellipse,var(--glow-cyan) 0%,transparent 70%);
+      filter:blur(40px); z-index:-1; animation:glowPulse 3s ease-in-out infinite;
+    }
+    @keyframes glowPulse { 0%,100%{opacity:.6;transform:scale(1);} 50%{opacity:1;transform:scale(1.05);} }
+
+    .time-digit-group { display:flex; align-items:flex-end; }
+    .time-digit-group .time-display { letter-spacing:0; }
+
+    .time-display {
+      font-family:'Orbitron',monospace;
+      font-size:clamp(80px,16vw,200px);
+      font-weight:900; letter-spacing:.04em; line-height:.9;
+      background:linear-gradient(135deg,#e8f4fd 0%,var(--accent-cyan) 40%,var(--accent-blue) 70%,#7986cb 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+      position:relative; font-variant-numeric:tabular-nums;
+    }
+    .time-display::after {
+      content:attr(data-time); position:absolute; inset:0;
+      font-family:'Orbitron',monospace; font-weight:900; letter-spacing:.04em;
+      background:linear-gradient(135deg,#e8f4fd 0%,var(--accent-cyan) 40%,var(--accent-blue) 70%,#7986cb 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+      filter:blur(20px); opacity:.5; z-index:-1;
+    }
+    .time-colon-sep {
+      font-family:'Orbitron',monospace;
+      font-size:clamp(80px,16vw,200px);
+      font-weight:900; line-height:.9; letter-spacing:0;
+      color:var(--accent-cyan); -webkit-text-fill-color:var(--accent-cyan);
+      text-shadow:0 0 28px rgba(0,229,255,0.8);
+      animation:colonBlink 1s step-start infinite;
+      margin:0 -4px; align-self:flex-end; padding-bottom:0.08em;
+    }
+    @keyframes colonBlink { 0%,100%{opacity:1;} 50%{opacity:.08;} }
+    @keyframes digitFadeUp {
+      from { opacity:1; transform:translateY(0) scale(1); }
+      to   { opacity:0; transform:translateY(-0.09em) scale(0.95); }
+    }
+    @keyframes digitFadeDown {
+      from { opacity:0; transform:translateY(0.09em) scale(0.95); }
+      to   { opacity:1; transform:translateY(0) scale(1); }
+    }
+    .digit-exit  { animation:digitFadeUp   0.2s  ease-in  forwards; }
+    .digit-enter { animation:digitFadeDown 0.32s ease-out forwards; }
+    .ampm {
+      font-family:'Orbitron',monospace; font-size:clamp(22px,2.8vw,44px);
+      font-weight:400; letter-spacing:.15em; color:var(--accent-blue); opacity:.8;
+      align-self:flex-end; margin-bottom:10px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      width:80%; height:1px;
+      background:linear-gradient(90deg,transparent,var(--accent-cyan),var(--accent-blue),transparent);
+      opacity:.3; margin:5px auto; animation:dividerGlow 4s ease-in-out infinite;
+    }
+    @keyframes dividerGlow { 0%,100%{opacity:.2;} 50%{opacity:.5;} }
+
+    /* ── DAY ── */
+    .day-section { display:flex; align-items:center; justify-content:center; width:100%; margin-top:2px; }
+    .day-display {
+      font-family:'Inter',sans-serif; font-size:clamp(36px,6vw,76px);
+      font-weight:200; letter-spacing:.35em; text-transform:uppercase;
+      color:var(--text-primary); opacity:.95; position:relative;
+    }
+    .day-display::before {
+      content:''; position:absolute; bottom:-4px; left:50%; transform:translateX(-50%);
+      width:40%; height:2px;
+      background:linear-gradient(90deg,transparent,var(--accent-purple),transparent);
+      border-radius:2px; animation:underlineExpand .6s ease forwards;
+    }
+    @keyframes underlineExpand { from{width:0;opacity:0;} to{width:40%;opacity:1;} }
+    .day-transition { animation:dayChange .6s ease; }
+    @keyframes dayChange { 0%{opacity:0;transform:translateY(-10px);} 100%{opacity:1;transform:translateY(0);} }
+
+    /* ═══════════════════════════════════════════════════════════════
+       HORIZONTAL INFO STRIP — 5 columns
+    ═══════════════════════════════════════════════════════════════ */
+    .info-strip {
+      display:flex; align-items:stretch;
+      width:100%; margin-top:12px;
+      background:var(--bg-card);
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:22px; overflow:hidden;
+      backdrop-filter:blur(12px); position:relative;
+    }
+    .info-strip::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,var(--accent-warm),var(--accent-cyan),var(--accent-blue),var(--accent-purple));
+      opacity:.5;
+    }
+    .info-sep { width:1px; flex-shrink:0; background:rgba(255,255,255,.07); margin:12px 0; }
+    .info-col { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:14px 10px; flex:1; gap:3px; }
+    .col-label { font-size:9px; font-weight:600; letter-spacing:.22em; text-transform:uppercase; color:var(--text-dim); margin-bottom:2px; }
+
+    .col-temp { flex:1.8; border-left:3px solid rgba(255,183,77,.25); }
+    .temp-row { display:flex; align-items:flex-start; gap:3px; }
+    .temp-value {
+      font-family:'Orbitron',monospace; font-size:clamp(64px,8vw,110px);
+      font-weight:700; color:var(--accent-warm); line-height:1;
+      text-shadow:0 0 30px rgba(255,183,77,.5);
+    }
+    .temp-unit { font-family:'Orbitron',monospace; font-size:clamp(26px,3vw,42px); font-weight:400; color:var(--accent-warm); opacity:.7; margin-top:10px; }
+    .feels-badge { font-size:14px; color:var(--text-secondary); letter-spacing:.04em; }
+    .feels-badge span { color:var(--accent-warm); font-weight:600; }
+    @keyframes tempFlash {
+      0%{text-shadow:0 0 30px rgba(255,183,77,.5);}
+      50%{text-shadow:0 0 70px rgba(255,183,77,1),0 0 120px rgba(255,183,77,.6);}
+      100%{text-shadow:0 0 30px rgba(255,183,77,.5);}
+    }
+    .temp-flash { animation:tempFlash 1s ease-out; }
+
+    .col-cond { flex:1.6; }
+    .cond-icon-img { width:88px; height:88px; object-fit:contain; animation:iconFloat 4s ease-in-out infinite; filter:drop-shadow(0 4px 16px rgba(0,0,0,0.5)); }
+    @keyframes iconFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-7px);} }
+    .cond-label { font-size:clamp(14px,1.6vw,20px); font-weight:500; color:var(--text-primary); text-align:center; }
+    .cond-sub   { font-size:13px; color:var(--text-secondary); text-align:center; }
+
+    .col-hl { flex:1.0; }
+    .hl-val { font-family:'Orbitron',monospace; font-size:clamp(22px,2.7vw,38px); font-weight:700; line-height:1.2; }
+    .hl-hi { color:#ef9a9a; }
+    .hl-lo { color:#90caf9; }
+    .hl-divline { width:30px; height:1px; background:rgba(255,255,255,.12); margin:5px 0; }
+    .hl-wind { font-size:13px; color:var(--text-secondary); margin-top:5px; }
+    .hl-wind span { color:var(--accent-blue); font-weight:600; }
+
+    .col-metrics { flex:1.4; }
+    .metric-pill {
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:clamp(14px,1.6vw,20px); font-weight:600; letter-spacing:.04em;
+      border-radius:24px; padding:8px 18px; margin:4px 0; white-space:nowrap;
+    }
+    .mp-uv   { background:rgba(255,238,88,.1); border:1px solid rgba(255,238,88,.25); color:#fff176; }
+    .mp-aqi  { background:rgba(105,240,174,.1); border:1px solid rgba(105,240,174,.25); color:#69f0ae; }
+    .mp-uv-low   { color:#a5d6a7; border:1px solid rgba(165,214,167,.25); background:rgba(165,214,167,.08); }
+    .mp-uv-mod   { color:#fff176; border:1px solid rgba(255,238,88,.25);  background:rgba(255,238,88,.08); }
+    .mp-uv-high  { color:#ffb74d; border:1px solid rgba(255,183,77,.3);   background:rgba(255,183,77,.08); }
+    .mp-uv-vhigh { color:#ef9a9a; border:1px solid rgba(239,154,154,.3);  background:rgba(239,154,154,.08); }
+    .mp-uv-ext   { color:#b39ddb; border:1px solid rgba(179,157,219,.3);  background:rgba(179,157,219,.08); }
+    .mp-aqi-mod  { background:rgba(255,238,88,.1); border:1px solid rgba(255,238,88,.3); color:#fff176; }
+    .mp-aqi-usg  { background:rgba(255,183,77,.1); border:1px solid rgba(255,183,77,.3); color:#ffb74d; }
+    .mp-aqi-un   { background:rgba(239,154,154,.1); border:1px solid rgba(239,154,154,.3); color:#ef9a9a; }
+    .mp-aqi-vun  { background:rgba(179,157,219,.1); border:1px solid rgba(179,157,219,.3); color:#b39ddb; }
+    .mp-aqi-haz  { background:rgba(188,0,0,.2); border:1px solid rgba(255,0,0,.3); color:#ff5252; }
+
+    .col-date { flex:1.5; border-right:3px solid rgba(79,195,247,.2); }
+    .date-mo-sm { font-family:'Orbitron',monospace; font-size:clamp(11px,1.3vw,17px); font-weight:400; letter-spacing:.22em; color:var(--accent-blue); opacity:.8; text-transform:uppercase; }
+    .date-num-lg { font-family:'Orbitron',monospace; font-size:clamp(58px,7.5vw,102px); font-weight:700; color:var(--text-primary); line-height:1; text-shadow:0 0 30px rgba(79,195,247,.4); }
+    .date-ordinal { font-size:.38em; vertical-align:super; color:var(--accent-blue); font-weight:400; }
+    .date-dn { font-size:14px; color:var(--text-secondary); letter-spacing:.06em; }
+    .location-pill {
+      display:inline-flex; align-items:center; gap:4px;
+      font-size:10px; font-weight:500; letter-spacing:.07em; color:var(--accent-blue);
+      background:rgba(79,195,247,.07); border:1px solid rgba(79,195,247,.14);
+      border-radius:20px; padding:3px 10px; margin-top:6px;
+      cursor:pointer; transition:background .3s,border-color .3s; width:-webkit-fit-content; width:fit-content;
+    }
+    .location-pill:hover { background:rgba(79,195,247,.15); border-color:rgba(79,195,247,.35); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       FORECAST BRIEF
+    ═══════════════════════════════════════════════════════════════ */
+    .forecast-brief {
+      display:flex; align-items:center;
+      width:100%; margin-top:10px;
+      background:var(--bg-card);
+      border:1px solid rgba(255,255,255,.07);
+      border-radius:18px; padding:14px 24px;
+      position:relative; backdrop-filter:blur(12px); overflow:hidden;
+      gap:16px; min-height:76px;
+    }
+    .forecast-brief::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,var(--accent-cyan),var(--accent-blue),var(--accent-purple));
+      opacity:.4;
+    }
+    .brief-header { font-size:9px; font-weight:600; letter-spacing:.2em; text-transform:uppercase; color:var(--text-dim); white-space:nowrap; flex-shrink:0; }
+    .brief-items { display:flex; align-items:stretch; flex:1; gap:0; }
+    .brief-item { flex:1; display:flex; align-items:center; gap:13px; padding:4px 22px; border-left:1px solid rgba(255,255,255,.07); }
+    .brief-item:first-child { border-left:none; padding-left:0; }
+    .brief-icon { font-size:28px; flex-shrink:0; line-height:1; }
+    .brief-text { font-size:clamp(12px,1.35vw,17px); color:var(--text-secondary); line-height:1.4; font-weight:400; }
+    .brief-text strong { color:var(--text-primary); font-weight:600; }
+
+    /* ── STATUS BAR ── */
+    .status-bar { display:flex; align-items:center; justify-content:space-between; width:100%; margin-top:8px; padding:0 4px; }
+    .status-text { font-size:9px; font-weight:500; letter-spacing:.15em; color:var(--text-dim); text-transform:uppercase; display:flex; align-items:center; gap:7px; }
+    .status-dot { width:5px; height:5px; background:var(--accent-green); border-radius:50%; box-shadow:0 0 7px var(--accent-green); animation:statusPulse 2s ease-in-out infinite; }
+    @keyframes statusPulse { 0%,100%{opacity:1;box-shadow:0 0 8px var(--accent-green);} 50%{opacity:.4;box-shadow:0 0 3px var(--accent-green);} }
+    .last-update { font-size:9px; color:var(--text-dim); letter-spacing:.1em; }
+
+    /* ── SECONDS ARC ── */
+    .seconds-arc-wrapper { position:relative; width:58px; height:58px; display:flex; align-items:center; justify-content:center; }
+    .seconds-arc { display:block; overflow:visible; }
+    .arc-bg  { fill:none; stroke:rgba(79,195,247,.1); stroke-width:3; }
+    .arc-fill { fill:none; stroke:var(--accent-cyan); stroke-width:3; stroke-linecap:round; stroke-dasharray:163; stroke-dashoffset:163; transition:stroke-dashoffset .9s linear; filter:drop-shadow(0 0 4px var(--accent-cyan)); }
+
+    /* ── PARTICLES ── */
+    .particles { position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden; }
+    .particle { position:absolute; border-radius:50%; opacity:0; animation:particleDrift var(--dur) ease-in infinite; animation-delay:var(--delay); left:var(--x); top:100%; }
+    @keyframes particleDrift { 0%{opacity:0;transform:translateY(0) translateX(0);} 10%{opacity:.6;} 90%{opacity:.3;} 100%{opacity:0;transform:translateY(-100vh) translateX(var(--drift));} }
+
+    /* ── TOAST ── */
+    .geo-toast {
+      position:fixed; bottom:28px; left:50%;
+      -webkit-transform:translateX(-50%) translateY(100px);
+      transform:translateX(-50%) translateY(100px);
+      background:rgba(15,22,41,.95); border:1px solid rgba(79,195,247,.28);
+      border-radius:14px; padding:12px 22px;
+      font-size:12px; color:var(--text-secondary); letter-spacing:.06em;
+      backdrop-filter:blur(20px); z-index:300;
+      transition:transform .4s ease, opacity .4s ease;
+      opacity:0; display:flex; align-items:center; gap:9px; white-space:nowrap;
+    }
+    .geo-toast.show { -webkit-transform:translateX(-50%) translateY(0); transform:translateX(-50%) translateY(0); opacity:1; }
+
+    /* ── FADE-IN ── */
+    .fade-in { animation:fadeIn 1.2s ease forwards; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(14px);} to{opacity:1;transform:translateY(0);} }
+    .fd1{animation-delay:.2s;opacity:0;} .fd2{animation-delay:.4s;opacity:0;} .fd3{animation-delay:.6s;opacity:0;} .fd4{animation-delay:.8s;opacity:0;}
+
     @media(max-width:768px){
-      .dashboard{padding:14px 18px 12px;}
-      .stock-table th,.stock-table td{padding:8px 10px;}
-      .td-name,.week52-wrap{display:none;}
-    }
-
-    /* ── Phone portrait (scroll layout) ── */
-    @media(max-width:600px),(max-width:700px) and (orientation:portrait){
-      html,body{overflow-y:auto;}
-
-      .dashboard{
-        height:auto; min-height:100dvh;
-        grid-template-rows:auto auto auto auto auto;
-        padding:12px 14px 16px; gap:2px;
-      }
-
-      /* Top strip: [Time | Temp] then [Day Date] — overflow contained */
-      .top-strip{flex-wrap:wrap;padding-bottom:8px;margin-bottom:6px;overflow:hidden;}
-      .top-time-wrap{flex:1;order:1;min-width:0;overflow:hidden;}
-      .top-right{order:2;text-align:right;min-width:0;max-width:45%;}
-      .top-temp{white-space:nowrap;}
-      .top-center{
-        order:3;width:100%;display:flex;align-items:baseline;gap:10px;
-        border-top:1px solid rgba(255,255,255,.07);padding-top:6px;margin-top:6px;
-      }
-      .top-dayname{font-size:clamp(14px,5vw,22px);letter-spacing:.2em;}
-      .top-datestr{font-size:clamp(10px,3.5vw,14px);letter-spacing:.1em;margin-top:0;opacity:.7;}
-      .top-time{font-size:clamp(42px,13vw,68px);}
-      .top-colon{font-size:clamp(42px,13vw,68px);}
-      .top-ampm{font-size:clamp(13px,4vw,20px);}
-      .top-temp{font-size:clamp(26px,8vw,42px);}
-      .top-condition{font-size:11px;}
-      .top-location{font-size:10px;}
-
-      /* Market strip: stack vertically */
-      .market-strip{flex-direction:column;align-items:flex-start;padding:6px 0 8px;gap:6px;}
-      .mkt-right{gap:8px;flex-wrap:wrap;}
-      .index-pills{gap:6px;}
-      .index-pill{padding:3px 10px;}
-      .fng-badge{padding:3px 10px;font-size:11px;}
-
-      /* Portfolio: compact */
-      .portfolio-section{padding:8px 0 8px;}
-      .pf-label{font-size:9px;letter-spacing:.2em;}
-      .pf-total{font-size:clamp(36px,12vw,64px);}
-      .pf-change{font-size:clamp(12px,3.8vw,16px);}
-      .pf-meta{gap:8px;margin-top:6px;}
-      .pf-meta-chip{padding:2px 10px;}
-      .pf-meta-label{font-size:8px;}
-      .pf-meta-val{font-size:11px;}
-
-      /* Stock table: compact, natural height (page scrolls) */
-      .stock-table-wrap{border-radius:14px;overflow:hidden;}
-      .stock-table th,.stock-table td{padding:8px 6px;}
-      .stock-table th:nth-child(2){display:none;} /* hide Shares header */
-      .stock-table td:nth-child(2){display:none;} /* hide Shares cells */
-      .td-name,.week52-wrap{display:none;}
-      .td-symbol{font-size:13px;}
-      .td-price{font-size:12px;}
-      .td-value{font-size:13px;}
-      .td-change{font-size:11px;}
-      /* Portrait: show % only in change column, hide full amount */
-      .chg-full{display:none;}
-      .chg-short{display:inline;}
-
-      /* Status bar: compact row */
-      .status-bar{flex-wrap:wrap;gap:6px;margin-top:6px;}
-      .status-right{gap:8px;}
-      .currency-sel{font-size:10px;padding:3px 6px;}
-      .btn-edit{padding:4px 10px;font-size:10px;}
+      .dashboard{padding:14px 16px 12px;}
+      .info-strip{flex-wrap:wrap;}
+      .info-col{min-width:45%;}
+      .info-sep{display:none;}
+      .brief-items{flex-direction:column;}
+      .brief-item{border-left:none;border-top:1px solid rgba(255,255,255,.07);padding:8px 0;}
+      .brief-item:first-child{border-top:none;padding-top:0;}
     }
   </style>
 </head>
 <body>
 
 <div id="bgSky"></div>
+<div id="horizonGlow"></div>
+<div id="starField"></div>
+<div id="dayField"></div>
+<div id="auroraWrap">
+  <div class="aurora-band ab1"></div>
+  <div class="aurora-band ab2"></div>
+  <div class="aurora-band ab3"></div>
+</div>
+
+<div class="night-banner">&#127769; Night Mode &mdash; Tap anywhere to wake</div>
 <div class="bg-grid"></div>
 <div class="scanline"></div>
 <div class="bg-orb bg-orb-1"></div>
 <div class="bg-orb bg-orb-2"></div>
 <div class="bg-orb bg-orb-3"></div>
-
-<!-- ══════════ SETUP MODAL ══════════ -->
-<div class="setup-overlay" id="setupOverlay">
-  <div class="setup-card fade-in">
-    <div class="setup-title">Portfolio Setup</div>
-    <div class="setup-hint">Saved locally — never sent anywhere.</div>
-
-    <div class="setup-section-label">Your Holdings</div>
-    <div id="stockInputList"></div>
-    <button class="btn-add-stock" id="btnAddStock">&#43; Add Stock</button>
-
-    <div class="setup-section-label">Stock Data API (optional — strongly recommended)</div>
-    <div class="api-row">
-      <input type="text" id="finnhubKey" placeholder="Finnhub API key (for beta, 52W, dividends)" />
-      <a class="api-link" href="https://finnhub.io" target="_blank">Free key &#8599;</a>
-    </div>
-    <div class="api-note">Free at finnhub.io. Required for portfolio beta, 52-week range, and dividends. Without it those columns show "--".</div>
-
-    <div class="setup-error" id="setupError"></div>
-    <div class="setup-footer">
-      <button class="btn-save" id="btnSave">Save &amp; Start &#8594;</button>
-    </div>
-  </div>
+<div class="particles" id="particles"></div>
+<div class="geo-toast" id="geoToast">
+  <span>&#128205;</span><span id="geoToastMsg">Detecting location&hellip;</span>
 </div>
 
-<!-- ══════════ MAIN DASHBOARD ══════════ -->
-<div class="dashboard fade-in" id="mainDashboard" style="display:none">
+<div class="dashboard">
 
-  <!-- TOP: Time | Day/Date | Temp -->
-  <div class="top-strip">
-    <div class="top-time-wrap">
-      <div class="top-digit-group">
-        <span class="top-time" id="th1">1</span><span class="top-time" id="th2">2</span>
+  <div class="time-section fade-in">
+    <div class="time-wrapper">
+      <div class="time-glow"></div>
+      <div class="time-digit-group">
+        <div class="time-display" id="timeH1" data-time="1">1</div>
+        <div class="time-display" id="timeH2" data-time="2">2</div>
       </div>
-      <span class="top-colon">:</span>
-      <div class="top-digit-group">
-        <span class="top-time" id="tm1">0</span><span class="top-time" id="tm2">0</span>
+      <div class="time-colon-sep" id="timeColon">:</div>
+      <div class="time-digit-group">
+        <div class="time-display" id="timeM1" data-time="0">0</div>
+        <div class="time-display" id="timeM2" data-time="0">0</div>
       </div>
-      <span class="top-ampm" id="topAmpm">&nbsp;PM</span>
-    </div>
-    <div class="top-center">
-      <div class="top-dayname" id="topDay">SATURDAY</div>
-      <div class="top-datestr" id="topDate">JUNE 20, 2026</div>
-    </div>
-    <div class="top-right">
-      <div class="top-temp" id="topTemp">--&deg;C</div>
-      <div class="top-condition" id="topCondition">Loading&hellip;</div>
-      <div class="top-location" id="topLocation" onclick="tryGeo()">&#128205; San Jose, CA</div>
+      <div class="ampm" id="ampmDisplay">AM</div>
     </div>
   </div>
 
-  <!-- MARKET STRIP: Indices + Fear & Greed -->
-  <div class="market-strip">
-    <div class="index-pills" id="indexPills">
-      <div class="index-pill"><span class="idx-label">S&amp;P 500</span><span class="idx-chg idx-flat" id="idxSPY"><span class="spinner"></span></span></div>
-      <div class="index-pill"><span class="idx-label">NASDAQ</span><span class="idx-chg idx-flat" id="idxQQQ"><span class="spinner"></span></span></div>
-      <div class="index-pill"><span class="idx-label">DOW</span><span class="idx-chg idx-flat" id="idxDIA"><span class="spinner"></span></span></div>
-    </div>
-    <div class="mkt-right">
-      <div class="mkt-badge mkt-closed" id="mktBadge">
-        <span class="mkt-dot"></span><span id="mktLabel">Checking&hellip;</span>
+  <div class="divider fade-in fd1"></div>
+
+  <div class="day-section fade-in fd1">
+    <div class="day-display" id="dayDisplay">THURSDAY</div>
+  </div>
+
+  <div class="info-strip fade-in fd2">
+    <div class="info-col col-temp">
+      <div class="col-label" id="tempLabel">TEMPERATURE</div>
+      <div class="temp-row">
+        <span class="temp-value" id="tempValue">--</span>
+        <span class="temp-unit">&deg;C</span>
       </div>
-      <div class="fng-badge fng-unknown" id="fngBadge">&#129504; F&amp;G --</div>
+      <div class="feels-badge" id="feelsBadge">Feels <span>--&deg;</span></div>
+    </div>
+    <div class="info-sep"></div>
+    <div class="info-col col-cond">
+      <div class="col-label">CONDITION</div>
+      <img class="cond-icon-img" id="weatherIcon" src="" alt="Weather" width="88" height="88" />
+      <div class="cond-label" id="weatherCondition">Loading&hellip;</div>
+      <div class="cond-sub" id="tempMeta">Humidity &mdash;</div>
+    </div>
+    <div class="info-sep"></div>
+    <div class="info-col col-hl">
+      <div class="col-label">TODAY</div>
+      <div class="hl-val hl-hi" id="hlHigh">&#8593; --&deg;</div>
+      <div class="hl-divline"></div>
+      <div class="hl-val hl-lo" id="hlLow">&#8595; --&deg;</div>
+      <div class="hl-wind">Wind <span id="windVal">--</span></div>
+    </div>
+    <div class="info-sep"></div>
+    <div class="info-col col-metrics">
+      <div class="col-label">AIR &amp; UV</div>
+      <div class="metric-pill mp-uv" id="uvPill">&#9728; UV --</div>
+      <div class="metric-pill mp-aqi" id="aqiPill">&#128168; AQI --</div>
+    </div>
+    <div class="info-sep"></div>
+    <div class="info-col col-date">
+      <div class="date-mo-sm" id="monthYear">JUNE 2026</div>
+      <div class="date-num-lg" id="dayNum">19<span class="date-ordinal">th</span></div>
+      <div class="date-dn" id="dateFull">Thursday, June 19</div>
+      <div class="location-pill" id="locationPill" title="Tap to detect location" onclick="initLocation()">
+        <span>&#128205;</span><span id="locationText">San Jose, CA</span>
+      </div>
     </div>
   </div>
 
-  <!-- PORTFOLIO TOTAL -->
-  <div class="portfolio-section">
-    <div class="pf-label">PORTFOLIO VALUE</div>
-    <div class="pf-total" id="pfTotal">&#8203;</div>
-    <div class="pf-change flat" id="pfChange">&mdash;</div>
-    <div class="pf-meta" id="pfMeta">
-      <div class="pf-meta-chip">
-        <span class="pf-meta-label">Beta</span>
-        <span class="pf-meta-val" id="pfBeta">--</span>
-      </div>
-      <div class="pf-meta-chip">
-        <span class="pf-meta-label">Annual Div</span>
-        <span class="pf-meta-val" id="pfDiv">--</span>
-      </div>
+  <div class="forecast-brief fade-in fd3">
+    <div class="brief-header">&#9679; 6-DAY OUTLOOK</div>
+    <div class="brief-items" id="briefItems">
+      <div class="brief-item"><span class="brief-icon">&#9203;</span><span class="brief-text">Analysing forecast data&hellip;</span></div>
     </div>
   </div>
 
-  <!-- STOCK TABLE -->
-  <div class="stock-table-wrap">
-    <table class="stock-table">
-      <thead>
-        <tr>
-          <th>Stock &amp; 52W</th>
-          <th>Shares</th>
-          <th>Price</th>
-          <th>Value</th>
-          <th>Day Change</th>
-        </tr>
-      </thead>
-      <tbody id="stockTableBody">
-        <tr><td colspan="5" class="stock-empty">Loading&hellip;</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- STATUS BAR -->
-  <div class="status-bar">
-    <div class="status-left">
-      <span class="status-dot"></span><span>LIVE</span>
+  <div class="status-bar fade-in fd4">
+    <div class="status-text">
+      <div class="status-dot"></div>
+      <span id="nightModeLabel">LIVE</span>
     </div>
-    <div class="status-right">
-      <span class="last-update">Updated: <span id="lastUpdate">--:--</span></span>
-      <select class="currency-sel" id="currencySel">
-        <option value="USD">$ USD</option>
-        <option value="EUR">€ EUR</option>
-        <option value="GBP">£ GBP</option>
-        <option value="CAD">CA$ CAD</option>
-        <option value="INR">₹ INR</option>
-      </select>
-      <button class="btn-edit" id="btnEdit">&#9881; Edit</button>
+    <div class="seconds-arc-wrapper">
+      <svg class="seconds-arc" viewBox="0 0 60 60" width="58" height="58">
+        <circle class="arc-bg" cx="30" cy="30" r="26"/>
+        <circle class="arc-fill" id="secondsArc" cx="30" cy="30" r="26" transform="rotate(-90 30 30)"/>
+        <text id="secondsText" x="30" y="30" text-anchor="middle" dominant-baseline="central"
+              font-family="Orbitron, monospace" font-size="13" font-weight="700" fill="#00e5ff">00</text>
+      </svg>
     </div>
+    <div class="last-update">Updated: <span id="lastUpdate">--:--</span></div>
   </div>
 
 </div>
@@ -396,562 +530,541 @@
 <script>
 'use strict';
 
-// ══════════════════════════════════════════════
-// STORAGE
-// ══════════════════════════════════════════════
-var STORAGE_KEY   = 'stockDash_portfolio_v1';
-var FINHUB_KEY_ST = 'stockDash_finnhub_v1';
-var CURRENCY_KEY  = 'stockDash_currency_v1';
+// ══════════════════════════════════════════════════════════════════════
+// DYNAMIC SKY SYSTEM — richer hue, no celestial object
+// ══════════════════════════════════════════════════════════════════════
 
-function loadPortfolio() { try { var d=localStorage.getItem(STORAGE_KEY); return d?JSON.parse(d):null; } catch(e){return null;} }
-function savePortfolio(p){ localStorage.setItem(STORAGE_KEY,JSON.stringify(p)); }
-
-// ══════════════════════════════════════════════
-// STATE
-// ══════════════════════════════════════════════
-var portfolio   = [];
-var priceData   = {};  // {SYM: {price,change,changePct,name,state,error}}
-var metricsData = {};  // {SYM: {high52,low52,beta,divYield}}
-var indexPrices = {};  // {SPY:{changePct},QQQ:{changePct},DIA:{changePct}}
-var finnhubKey  = '';
-var fetchTimer  = null;
-var REFRESH_MS  = 5 * 60 * 1000;
-
-// ══════════════════════════════════════════════
-// CURRENCY
-// ══════════════════════════════════════════════
-var CURRENCIES = {
-  USD: { symbol:'$',   label:'USD', rate:1 },
-  EUR: { symbol:'\u20ac', label:'EUR', rate:0 },
-  GBP: { symbol:'\u00a3', label:'GBP', rate:0 },
-  CAD: { symbol:'CA$', label:'CAD', rate:0 },
-  INR: { symbol:'\u20b9', label:'INR', rate:0 }
+var SKY_THEMES = {
+  midnight: {
+    bodyBg:'#02030c',
+    skyBg:'radial-gradient(ellipse at 35% 20%, #0d1535 0%, #03040e 100%)',
+    orb:['#0f1660','#0c062e','#06102e'],
+    auroraOp:0.72,
+    auroraC:['linear-gradient(90deg,transparent,#004090,#006055,transparent)',
+             'linear-gradient(90deg,transparent,#480075,#008060,transparent)',
+             'linear-gradient(90deg,transparent,#002870,#700080,transparent)'],
+    starOp:1.0, dayFieldOp:0, horizonOp:0,
+    horizonBg:'linear-gradient(to top,rgba(10,20,70,0.25),transparent)'
+  },
+  predawn: {
+    bodyBg:'#03030f',
+    skyBg:'radial-gradient(ellipse at 22% 85%, #1e1030 0%, #050412 100%)',
+    orb:['#220a55','#380848','#0e0a34'],
+    auroraOp:0.52,
+    auroraC:['linear-gradient(90deg,transparent,#380075,#004068,transparent)',
+             'linear-gradient(90deg,transparent,#680095,#007055,transparent)',
+             'linear-gradient(90deg,transparent,#280068,#700035,transparent)'],
+    starOp:0.6, dayFieldOp:0, horizonOp:0.18,
+    horizonBg:'linear-gradient(to top,rgba(100,25,120,0.28),rgba(25,12,70,0.12),transparent)'
+  },
+  sunrise: {
+    bodyBg:'#05030a',
+    skyBg:'radial-gradient(ellipse at 88% 100%, #3e1605 0%, #060409 70%)',
+    orb:['#5a1e00','#2e0030','#001e38'],
+    auroraOp:0,
+    auroraC:['linear-gradient(90deg,transparent,#702500,#380050,transparent)',
+             'linear-gradient(90deg,transparent,#501500,#280060,transparent)',
+             'linear-gradient(90deg,transparent,#601000,#380038,transparent)'],
+    starOp:0.05, dayFieldOp:0.35, horizonOp:0.55,
+    horizonBg:'linear-gradient(to top,rgba(240,90,12,0.42),rgba(200,45,90,0.2),rgba(100,10,140,0.08),transparent)'
+  },
+  day: {
+    bodyBg:'#020609',
+    skyBg:'radial-gradient(ellipse at 50% 0%, #0c1e3c 0%, #020609 100%)',
+    orb:['#005070','#004040','#200060'],
+    auroraOp:0,
+    auroraC:['linear-gradient(90deg,transparent,#003868,#006848,transparent)',
+             'linear-gradient(90deg,transparent,#004888,#005848,transparent)',
+             'linear-gradient(90deg,transparent,#003858,#004868,transparent)'],
+    starOp:0, dayFieldOp:1.0, horizonOp:0,
+    horizonBg:'linear-gradient(to top,rgba(0,50,90,0.12),transparent)'
+  },
+  sunset: {
+    bodyBg:'#060307',
+    skyBg:'radial-gradient(ellipse at 90% 100%, #4a1000 0%, #080408 80%)',
+    orb:['#601800','#4a0028','#10004e'],
+    auroraOp:0,
+    auroraC:['linear-gradient(90deg,transparent,#902000,#380058,transparent)',
+             'linear-gradient(90deg,transparent,#701500,#500038,transparent)',
+             'linear-gradient(90deg,transparent,#801500,#280050,transparent)'],
+    starOp:0.03, dayFieldOp:0.25, horizonOp:0.62,
+    horizonBg:'linear-gradient(to top,rgba(255,75,10,0.48),rgba(220,25,90,0.25),rgba(100,0,140,0.12),transparent)'
+  },
+  dusk: {
+    bodyBg:'#03030a',
+    skyBg:'radial-gradient(ellipse at 74% 92%, #22083c 0%, #040409 80%)',
+    orb:['#380858','#240540','#080430'],
+    auroraOp:0.38,
+    auroraC:['linear-gradient(90deg,transparent,#740a98,#140075,transparent)',
+             'linear-gradient(90deg,transparent,#580078,#a00028,transparent)',
+             'linear-gradient(90deg,transparent,#42008a,#780060,transparent)'],
+    starOp:0.42, dayFieldOp:0, horizonOp:0.28,
+    horizonBg:'linear-gradient(to top,rgba(180,35,120,0.3),rgba(100,12,70,0.12),transparent)'
+  },
+  night: {
+    bodyBg:'#03030a',
+    skyBg:'radial-gradient(ellipse at 42% 25%, #151030 0%, #030309 100%)',
+    orb:['#200a52','#003c50','#300042'],
+    auroraOp:0.62,
+    auroraC:['linear-gradient(90deg,transparent,#00489a,#007865,transparent)',
+             'linear-gradient(90deg,transparent,#4a0082,#009878,transparent)',
+             'linear-gradient(90deg,transparent,#00287a,#780098,transparent)'],
+    starOp:0.9, dayFieldOp:0, horizonOp:0,
+    horizonBg:'linear-gradient(to top,rgba(12,18,50,0.18),transparent)'
+  }
 };
-var activeCurrency = localStorage.getItem(CURRENCY_KEY) || 'USD';
 
-function fetchExchangeRates() {
-  fetch('https://open.er-api.com/v6/latest/USD')
-    .then(function(r){ return r.json(); })
-    .then(function(d) {
-      if (d.result === 'success' && d.rates) {
-        CURRENCIES.EUR.rate = d.rates.EUR || 0;
-        CURRENCIES.GBP.rate = d.rates.GBP || 0;
-        CURRENCIES.CAD.rate = d.rates.CAD || 0;
-        CURRENCIES.INR.rate = d.rates.INR || 0;
-        reRenderAll();
-      }
-    }).catch(function(){});
+function getSkyThemeName() {
+  var h = new Date().getHours();
+  if (h < 4)  return 'midnight';
+  if (h < 6)  return 'predawn';
+  if (h < 8)  return 'sunrise';
+  if (h < 17) return 'day';
+  if (h < 19) return 'sunset';
+  if (h < 21) return 'dusk';
+  return 'night';
 }
 
-function getRate() {
-  var c = CURRENCIES[activeCurrency];
-  return (c && c.rate > 0) ? c.rate : 1;
-}
-function getSym() {
-  var c = CURRENCIES[activeCurrency];
-  return c ? c.symbol : '$';
-}
+var currentSkyTheme = '';
 
-// fmtDollar: integer rounding — for portfolio totals, position values, dividends
-function fmtDollar(usd) {
-  var v = usd * getRate();
-  var neg = v < 0, abs = Math.abs(v), sym = getSym();
-  var s;
-  if (activeCurrency === 'INR') {
-    if (abs >= 10000000) s = (abs/10000000).toFixed(1).replace(/\.0$/, '') + ' Cr';
-    else if (abs >= 100000) s = (abs/100000).toFixed(1).replace(/\.0$/, '') + ' L';
-    else s = Math.round(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
-  } else {
-    s = Math.round(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
-  }
-  return (neg?'-':'') + sym + s;
-}
+function applySkyTheme() {
+  var name = getSkyThemeName();
+  if (name === currentSkyTheme) return;
+  currentSkyTheme = name;
+  var t = SKY_THEMES[name];
 
-// fmtPrice: 2 decimal places — only for per-share stock prices
-function fmtPrice(usd) {
-  var v = usd * getRate();
-  var neg = v < 0, abs = Math.abs(v), sym = getSym();
-  var s;
-  if (activeCurrency === 'INR') {
-    s = Math.round(abs).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',');
-  } else {
-    var parts = abs.toFixed(2).split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,',');
-    s = parts.join('.');
-  }
-  return (neg?'-':'') + sym + s;
-}
+  document.body.style.backgroundColor = t.bodyBg;
+  var sky = document.getElementById('bgSky');
+  if (sky) sky.style.background = t.skyBg;
 
-function fmtShort(usd) {
-  var v = usd * getRate(), sym = getSym();
-  var abs = Math.abs(v), sign = v<0?'-':'+';
-  if (activeCurrency === 'INR') {
-    if (abs >= 10000000) return sign+sym+(abs/10000000).toFixed(1)+'Cr';
-    if (abs >= 100000)   return sign+sym+(abs/100000).toFixed(1)+'L';
-    if (abs >= 1000)     return sign+sym+(abs/1000).toFixed(0)+'K';
-    return sign+sym+abs.toFixed(0);
-  }
-  if (abs >= 1e9) return sign+sym+(abs/1e9).toFixed(2)+'B';
-  if (abs >= 1e6) return sign+sym+(abs/1e6).toFixed(2)+'M';
-  if (abs >= 1e3) return sign+sym+(abs/1e3).toFixed(1)+'K';
-  return sign+sym+abs.toFixed(2);
-}
+  var hg = document.getElementById('horizonGlow');
+  if (hg) { hg.style.opacity = t.horizonOp; hg.style.background = t.horizonBg; }
 
-// ══════════════════════════════════════════════
-// STOCK PRICE FETCHING
-// ══════════════════════════════════════════════
-function parseYahooChart(symbol, data) {
-  if (!data || !data.chart || !data.chart.result || !data.chart.result.length) throw new Error('No data');
-  var meta = data.chart.result[0].meta;
-  var prev = meta.chartPreviousClose || meta.previousClose || 0;
-  var curr = meta.regularMarketPrice || 0;
-  if (!curr) throw new Error('Zero price');
-  return { symbol:symbol, price:curr, change:curr-prev, changePct:prev?((curr-prev)/prev*100):0, prevClose:prev, name:meta.shortName||meta.longName||symbol, state:meta.marketState||'CLOSED', error:false };
-}
+  var sf = document.getElementById('starField');
+  if (sf) sf.style.opacity = t.starOp;
 
-function fetchYahooSingle(symbol) {
-  var chartUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + symbol + '?range=1d&interval=1d';
-  return fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(chartUrl))
-    .then(function(r){ if(!r.ok)throw new Error(r.status); return r.json(); })
-    .then(function(d){ return parseYahooChart(symbol, d); })
-    .catch(function() {
-      return fetch('https://corsproxy.io/?' + chartUrl)
-        .then(function(r){ return r.json(); })
-        .then(function(d){ return parseYahooChart(symbol, d); });
-    });
-}
+  var df = document.getElementById('dayField');
+  if (df) df.style.opacity = (t.dayFieldOp !== undefined ? t.dayFieldOp : 0);
 
-function fetchFinnhubSingle(symbol) {
-  var url = 'https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(symbol)+'&token='+encodeURIComponent(finnhubKey);
-  return fetch(url)
-    .then(function(r){ if(!r.ok)throw new Error(r.status); return r.json(); })
-    .then(function(q) {
-      if (!q||!q.c) throw new Error('No price');
-      var curr=q.c, prev=q.pc||0;
-      return { symbol:symbol, price:curr, change:q.d||(curr-prev), changePct:q.dp||(prev?(curr-prev)/prev*100:0), prevClose:prev, name:symbol, state:q.t>0?'REGULAR':'CLOSED', error:false };
-    });
-}
-
-function fetchOneSafe(symbol) {
-  var fn = finnhubKey ? fetchFinnhubSingle(symbol) : fetchYahooSingle(symbol);
-  return fn.catch(function(e) {
-    console.warn(symbol, e.message);
-    if (finnhubKey) return fetchYahooSingle(symbol).catch(function(){ return {symbol:symbol,error:true}; });
-    return {symbol:symbol, error:true};
-  });
-}
-
-// ── Finnhub metrics: 52W, beta, dividend ──
-function fetchFinnhubMetrics(symbol) {
-  if (!finnhubKey) return Promise.resolve();
-  var url = 'https://finnhub.io/api/v1/stock/metric?symbol='+encodeURIComponent(symbol)+'&metric=all&token='+encodeURIComponent(finnhubKey);
-  return fetch(url)
-    .then(function(r){ return r.json(); })
-    .then(function(d) {
-      if (d && d.metric) {
-        metricsData[symbol] = {
-          high52:      d.metric['52WeekHigh']                || 0,
-          low52:       d.metric['52WeekLow']                 || 0,
-          beta:        (d.metric.beta !== null && d.metric.beta !== undefined) ? d.metric.beta : null,
-          divPerShare: d.metric.dividendPerShareAnnual
-                       || d.metric.dividendPerShareTTM       || 0,
-          divYield:    d.metric.dividendYieldIndicatedAnnual
-                       || d.metric.dividendYield5Y           || 0
-        };
-      }
-    }).catch(function(){});
-}
-
-// ── Indices (SPY=S&P500, QQQ=NASDAQ, DIA=DOW) ──
-var INDEX_MAP = { SPY:'S&P 500', QQQ:'NASDAQ', DIA:'DOW' };
-
-function fetchIndices() {
-  ['SPY','QQQ','DIA'].forEach(function(sym) {
-    fetchOneSafe(sym).then(function(r) {
-      if (!r.error) {
-        var el = document.getElementById('idx'+sym);
-        if (el) {
-          var sign = r.changePct >= 0 ? '&#9650;' : '&#9660;';
-          var cls = r.changePct > 0.05 ? 'up' : (r.changePct < -0.05 ? 'down' : 'flat');
-          el.innerHTML = sign + '&nbsp;' + (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(2) + '%';
-          el.className = 'idx-chg idx-' + cls;
-        }
-        // Also update market status from SPY
-        if (sym === 'SPY') updateMarketStatus(r.state);
-      }
-    });
-  });
-}
-
-// ── Fear & Greed ──
-function fetchFearGreed() {
-  var url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://production.dataviz.cnn.io/index/fearandgreed/graphdata');
-  fetch(url)
-    .then(function(r){ return r.json(); })
-    .then(function(d) {
-      if (d && d.fear_and_greed) renderFNG(d.fear_and_greed.score, d.fear_and_greed.rating);
-    }).catch(function(){});
-}
-
-function renderFNG(score, rating) {
-  var el = document.getElementById('fngBadge');
-  if (!el) return;
-  var cls = 'fng-unknown', emoji = '\u{1F9E0}';
-  if (score <= 25)       { cls='fng-efear';  emoji='\ud83d\ude28'; }
-  else if (score <= 45)  { cls='fng-fear';   emoji='\ud83d\ude15'; }
-  else if (score <= 55)  { cls='fng-neutral';emoji='\ud83d\ude10'; }
-  else if (score <= 75)  { cls='fng-greed';  emoji='\ud83d\ude0f'; }
-  else                   { cls='fng-egreed'; emoji='\ud83e\udd11'; }
-  el.className = 'fng-badge ' + cls;
-  el.textContent = emoji + ' ' + Math.round(score) + ' \u00b7 ' + (rating || 'Unknown');
-}
-
-// ══════════════════════════════════════════════
-// MAIN FETCH CYCLE
-// ══════════════════════════════════════════════
-function fetchStockPrices() {
-  if (!portfolio.length) return;
-
-  var stockPromises  = portfolio.map(function(p){ return fetchOneSafe(p.symbol); });
-  var metricPromises = portfolio.map(function(p){ return fetchFinnhubMetrics(p.symbol); });
-
-  Promise.all(stockPromises).then(function(results) {
-    var any = false;
-    results.forEach(function(r){ priceData[r.symbol]=r; if(!r.error)any=true; });
-    // Wait for metrics too
-    Promise.all(metricPromises).then(function() {
-      renderTable();
-      updatePortfolioTotal();
-      renderPfMeta();
-      var now=new Date(), hh=now.getHours(), mm=now.getMinutes();
-      document.getElementById('lastUpdate').textContent = (hh<10?'0'+hh:hh)+':'+(mm<10?'0'+mm:mm);
-      if (!any) document.getElementById('lastUpdate').textContent = 'Failed \u2014 add Finnhub key or retry';
-    });
-  });
-}
-
-// ══════════════════════════════════════════════
-// PORTFOLIO CALCULATIONS
-// ══════════════════════════════════════════════
-function calcTotals() {
-  var val=0, chg=0, has=false;
-  portfolio.forEach(function(p){ var pd=priceData[p.symbol]; if(pd&&pd.price&&!pd.error){val+=p.shares*pd.price;chg+=p.shares*pd.change;has=true;} });
-  return {value:val, change:chg, hasPrices:has};
-}
-
-function calcPortfolioBeta() {
-  var totalVal=0, wBeta=0, has=false;
-  portfolio.forEach(function(p){
-    var pd=priceData[p.symbol], md=metricsData[p.symbol];
-    if(pd&&pd.price&&!pd.error&&md&&md.beta!==null&&md.beta!==undefined){
-      var v=p.shares*pd.price; totalVal+=v; wBeta+=v*md.beta; has=true;
-    }
-  });
-  return (has&&totalVal>0) ? wBeta/totalVal : null;
-}
-
-function calcAnnualDividends() {
-  var total=0, hasData=false;
-  portfolio.forEach(function(p){
-    var pd=priceData[p.symbol], md=metricsData[p.symbol];
-    if(md) hasData=true;
-    if(pd&&pd.price&&!pd.error&&md){
-      if(md.divPerShare>0){
-        total += p.shares * md.divPerShare;         // e.g. 100sh × $0.98/sh/yr
-      } else if(md.divYield>0){
-        total += p.shares * pd.price * (md.divYield/100); // fallback: yield%
-      }
-    }
-  });
-  return {total:total, hasData:hasData};
-}
-
-function render52wBar(symbol, price) {
-  var md = metricsData[symbol];
-  if (!md||!md.high52||!md.low52||!price||md.high52<=md.low52) return '';
-  var pos = Math.min(Math.max((price-md.low52)/(md.high52-md.low52),0),1);
-  var pct = Math.round(pos*100);
-  return '<div class="week52-wrap">'
-    + '<span class="week52-edge">L</span>'
-    + '<div class="week52-bar"><div class="week52-fill" style="width:'+pct+'%"></div></div>'
-    + '<span class="week52-edge">H</span>'
-    + '<span class="week52-pos">'+pct+'%</span>'
-    + '</div>';
-}
-
-// ══════════════════════════════════════════════
-// RENDERING
-// ══════════════════════════════════════════════
-function renderTable() {
-  var tbody = document.getElementById('stockTableBody');
-  var rows = portfolio.slice().sort(function(a,b){
-    var va=(priceData[a.symbol]&&priceData[a.symbol].price)?a.shares*priceData[a.symbol].price:0;
-    var vb=(priceData[b.symbol]&&priceData[b.symbol].price)?b.shares*priceData[b.symbol].price:0;
-    return vb-va;
-  });
-  var html='';
-  rows.forEach(function(p){
-    var pd=priceData[p.symbol], priceStr, valueStr, changeStr, changeCls, nameStr;
-    if(!pd){ priceStr='<span class="td-loading"><span class="spinner"></span></span>';valueStr='<span class="td-loading">&mdash;</span>';changeStr='&mdash;';changeCls='flat';nameStr=''; }
-    else if(pd.error){ priceStr='<span class="td-error">Error</span>';valueStr='<span class="td-error">--</span>';changeStr='--';changeCls='flat';nameStr='Unable to fetch'; }
-    else {
-      var v=p.shares*pd.price, chg=p.shares*pd.change;
-      priceStr=fmtPrice(pd.price); valueStr=fmtDollar(v);
-      var sign=chg>=0?'&#9650;':'&#9660;';
-      var pctStr=(pd.changePct>=0?'+':'')+pd.changePct.toFixed(2)+'%';
-      // chg-full shown in landscape; chg-short (% only) shown in portrait to prevent overflow
-      changeStr='<span class="chg-full">'+sign+'&nbsp;'+fmtShort(chg)+'&nbsp;('+pctStr+')</span>'
-               +'<span class="chg-short">'+sign+'&nbsp;'+pctStr+'</span>';
-      changeCls=chg>0.001?'up':(chg<-0.001?'down':'flat');
-      nameStr=pd.name;
-    }
-    html+='<tr>'
-      +'<td><div class="td-symbol">'+p.symbol+'</div><div class="td-name">'+nameStr+'</div>'
-      +(pd&&pd.price&&!pd.error?render52wBar(p.symbol,pd.price):'')+'</td>'
-      +'<td class="td-shares">'+p.shares.toLocaleString()+'</td>'
-      +'<td class="td-price">'+priceStr+'</td>'
-      +'<td class="td-value">'+valueStr+'</td>'
-      +'<td class="td-change '+changeCls+'">'+changeStr+'</td>'
-      +'</tr>';
-  });
-  tbody.innerHTML=html||'<tr><td colspan="5" class="stock-empty">No stocks.</td></tr>';
-}
-
-function renderTableSkeleton() {
-  var tbody=document.getElementById('stockTableBody'), html='';
-  portfolio.forEach(function(p){
-    html+='<tr><td><div class="td-symbol">'+p.symbol+'</div><div class="td-name">Loading&hellip;</div></td>'
-      +'<td class="td-shares">'+p.shares.toLocaleString()+'</td>'
-      +'<td class="td-loading"><span class="spinner"></span></td><td>&mdash;</td><td>&mdash;</td></tr>';
-  });
-  tbody.innerHTML=html||'<tr><td colspan="5" class="stock-empty">No stocks.</td></tr>';
-}
-
-var prevTotalValue = null;
-
-function updatePortfolioTotal() {
-  var totals=calcTotals();
-  var totalEl=document.getElementById('pfTotal'), changeEl=document.getElementById('pfChange');
-  if(!totals.hasPrices){ totalEl.textContent='--';changeEl.innerHTML='Fetching prices\u2026';changeEl.className='pf-change flat';return; }
-  var newVal=totals.value;
-  if(prevTotalValue!==null&&Math.abs(newVal-prevTotalValue)>0.01) animateVal(totalEl,prevTotalValue,newVal,800);
-  else totalEl.textContent=fmtDollar(newVal);
-  prevTotalValue=newVal;
-  totalEl.className='pf-total'+(totals.change>0.01?' up':totals.change<-0.01?' down':'');
-  changeEl.className='pf-change'+(totals.change>0.01?' up':totals.change<-0.01?' down':' flat');
-  var prevT=totals.value-totals.change, pct=prevT?totals.change/prevT*100:0;
-  changeEl.innerHTML=(totals.change>=0?'&#9650;':'&#9660;')+'&nbsp;'
-    +fmtShort(totals.change)+'&nbsp;&nbsp;('+(pct>=0?'+':'')+pct.toFixed(2)+'%)&nbsp;&nbsp;today';
-}
-
-function renderPfMeta() {
-  var betaVal = calcPortfolioBeta();
-  var betaEl  = document.getElementById('pfBeta');
-  if(betaEl){
-    if(betaVal===null){ betaEl.textContent='--'; betaEl.className='pf-meta-val'; }
-    else {
-      var cls='beta-low', desc='Low';
-      if(betaVal>1.5){cls='beta-vhigh';desc='High Risk';}
-      else if(betaVal>1.2){cls='beta-high';desc='Aggressive';}
-      else if(betaVal>0.8){cls='beta-mod';desc='Moderate';}
-      betaEl.textContent=betaVal.toFixed(2)+' \u00b7 '+desc;
-      betaEl.className='pf-meta-val '+cls;
+  var aw = document.getElementById('auroraWrap');
+  if (aw) {
+    aw.style.opacity = t.auroraOp;
+    var bands = aw.querySelectorAll('.aurora-band');
+    for (var j = 0; j < bands.length && j < t.auroraC.length; j++) {
+      bands[j].style.background = t.auroraC[j];
     }
   }
-  var divResult = calcAnnualDividends();
-  var divEl = document.getElementById('pfDiv');
-  if(divEl){
-    // Show dollar amount when Finnhub data present (even $0 for non-dividend stocks)
-    // '--' means no API key entered yet
-    divEl.textContent = divResult.hasData ? fmtDollar(divResult.total)+'/yr' : '--';
+
+  var orbs = document.querySelectorAll('.bg-orb');
+  for (var i = 0; i < orbs.length && i < t.orb.length; i++) {
+    orbs[i].style.background = 'radial-gradient(circle,' + t.orb[i] + ',transparent)';
   }
 }
 
-function updateMarketStatus(state) {
-  var badge=document.getElementById('mktBadge'), label=document.getElementById('mktLabel');
-  if(!badge||!label) return;
-  badge.className='mkt-badge';
-  if(state==='REGULAR'){ badge.classList.add('mkt-open'); label.textContent='Market Open'; }
-  else if(state==='PRE'){ badge.classList.add('mkt-pre'); label.textContent='Pre-Market'; }
-  else if(state==='POST'||state==='POSTPOST'){ badge.classList.add('mkt-after'); label.textContent='After Hours'; }
-  else { badge.classList.add('mkt-closed'); label.textContent='Market Closed'; }
+// ── Star field ────────────────────────────────────────────────────────
+function createStars() {
+  var sf = document.getElementById('starField');
+  if (!sf) return;
+  for (var i = 0; i < 80; i++) {
+    var s = document.createElement('div');
+    s.className = 'star-dot';
+    s.style.left = (Math.random() * 100) + 'vw';
+    s.style.top  = (Math.random() * 75) + 'vh';
+    var sz = (Math.random() * 2.4 + 0.4).toFixed(1);
+    s.style.width = s.style.height = sz + 'px';
+    s.style.setProperty('--mx', (Math.random() * 0.6 + 0.3).toFixed(2));
+    s.style.setProperty('--sd', (Math.random() * 3 + 1.5).toFixed(1) + 's');
+    s.style.setProperty('--dl', (Math.random() * 6).toFixed(1) + 's');
+    var tint = Math.random();
+    s.style.background = tint > 0.7 ? 'rgba(220,232,255,1)' : (tint > 0.4 ? '#fff' : 'rgba(255,248,220,1)');
+    sf.appendChild(s);
+  }
 }
 
-function reRenderAll() {
-  updatePortfolioTotal();
-  renderPfMeta();
-  renderTable();
+// ── Day field: clouds + birds (daytime only) ─────────────────────────
+function createDayField() {
+  var df = document.getElementById('dayField');
+  if (!df) return;
+
+  // Clouds — two layers: big puffy + wispy high-altitude
+  var clouds = [
+    {w:360,h:85,y:8, blur:32,alpha:0.062,dur:155,delay:-30},
+    {w:200,h:62,y:9, blur:18,alpha:0.042,dur:155,delay:-30},  // companion
+    {w:290,h:78,y:18,blur:28,alpha:0.055,dur:135,delay:-75},
+    {w:170,h:52,y:19,blur:16,alpha:0.038,dur:135,delay:-75},  // companion
+    {w:400,h:90,y:30,blur:36,alpha:0.052,dur:195,delay:-15},
+    {w:230,h:68,y:31,blur:22,alpha:0.036,dur:195,delay:-15},  // companion
+    {w:310,h:82,y:12,blur:30,alpha:0.058,dur:170,delay:-100},
+    // Wispy high clouds
+    {w:520,h:38,y:4, blur:48,alpha:0.030,dur:230,delay:-140},
+    {w:640,h:32,y:2, blur:55,alpha:0.025,dur:260,delay:-60},
+    {w:400,h:28,y:6, blur:42,alpha:0.028,dur:200,delay:-185},
+  ];
+
+  for (var ci = 0; ci < clouds.length; ci++) {
+    var cc = clouds[ci];
+    var c = document.createElement('div');
+    c.className = 'cloud';
+    c.style.width  = cc.w + 'px';
+    c.style.height = cc.h + 'px';
+    c.style.top    = cc.y + '%';
+    c.style.left   = '0';
+    c.style.setProperty('--cb',     cc.blur  + 'px');
+    c.style.setProperty('--ca',     cc.alpha);
+    c.style.setProperty('--cd',     cc.dur   + 's');
+    c.style.setProperty('--cdelay', cc.delay + 's');
+    df.appendChild(c);
+  }
+
+  // Birds — groups of V-shapes crossing the screen
+  var groups = [
+    {n:5, y:13, dur:72,  delay:-8,  scale:1.0},
+    {n:7, y:21, dur:94,  delay:-38, scale:0.82},
+    {n:4, y:9,  dur:58,  delay:-58, scale:1.12},
+    {n:6, y:17, dur:82,  delay:-22, scale:0.92},
+    {n:3, y:27, dur:105, delay:-72, scale:0.72},
+  ];
+
+  for (var gi = 0; gi < groups.length; gi++) {
+    var g = groups[gi];
+    var grp = document.createElement('div');
+    grp.className = 'bird-group';
+    grp.style.top  = g.y + '%';
+    grp.style.left = '0';
+    grp.style.setProperty('--bd',     g.dur   + 's');
+    grp.style.setProperty('--bdelay', g.delay + 's');
+
+    for (var bi = 0; bi < g.n; bi++) {
+      var bird = document.createElement('div');
+      bird.className = 'bird';
+      bird.style.marginLeft = (bi === 0 ? 0 : Math.round(Math.random() * 18 + 8)) + 'px';
+      bird.style.marginTop  = Math.round(Math.random() * 14 - 7) + 'px';
+      bird.style.setProperty('--bf',  (Math.random() * 0.45 + 0.55).toFixed(2) + 's');
+      bird.style.setProperty('--bfd', (Math.random() * 0.38).toFixed(2) + 's');
+      var sz = g.scale * (Math.random() * 8 + 13);
+      bird.innerHTML = '<svg viewBox="0 0 22 10" width="' + sz.toFixed(0) + '" height="' + (sz*0.46).toFixed(0)
+        + '" style="display:block;overflow:visible"><path d="M0,5 Q5.5,0 11,5 Q16.5,0 22,5"'
+        + ' fill="none" stroke="rgba(190,215,245,0.52)" stroke-width="1.3" stroke-linecap="round"/></svg>';
+      grp.appendChild(bird);
+    }
+    df.appendChild(grp);
+  }
 }
 
-function animateVal(el, from, to, dur) {
+function initSky() {
+  createStars();
+  createDayField();
+  applySkyTheme();
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PARTICLES
+// ══════════════════════════════════════════════════════════════════════
+(function() {
+  var c = document.getElementById('particles');
+  var colors = ['#4fc3f7','#00e5ff','#b39ddb','#69f0ae','#ffb74d'];
+  for (var i = 0; i < 28; i++) {
+    var p = document.createElement('div');
+    p.className = 'particle';
+    p.style.setProperty('--x',     (Math.random() * 100) + 'vw');
+    p.style.setProperty('--dur',   (13 + Math.random() * 18) + 's');
+    p.style.setProperty('--delay', (Math.random() * 22) + 's');
+    p.style.setProperty('--drift', (Math.random() * 80 - 40) + 'px');
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    var sz = (Math.random() * 2 + 1) + 'px';
+    p.style.width = p.style.height = sz;
+    c.appendChild(p);
+  }
+}());
+
+// ══════════════════════════════════════════════════════════════════════
+// CLOCK
+// ══════════════════════════════════════════════════════════════════════
+var lastSec = -1, lastMin = -1, lastDay = -1, lastH12 = -1;
+var CIRC = 2 * Math.PI * 26;
+
+function updateClock() {
+  var now = new Date();
+  var h = now.getHours(), m = now.getMinutes(), s = now.getSeconds(), d = now.getDay();
+  var h12 = h % 12 || 12;
+  var ampm = h < 12 ? 'AM' : 'PM';
+  var mStr = m < 10 ? '0' + m : '' + m;
+
+  if (m !== lastMin) {
+    var h12Str = h12 < 10 ? '0' + h12 : '' + h12;
+    if (lastMin === -1) {
+      setDigit('timeH1', h12Str.charAt(0)); setDigit('timeH2', h12Str.charAt(1));
+      setDigit('timeM1', mStr.charAt(0));   setDigit('timeM2', mStr.charAt(1));
+    } else {
+      var prevH = lastH12 < 10 ? '0' + lastH12 : '' + lastH12;
+      var prevM = lastMin  < 10 ? '0' + lastMin  : '' + lastMin;
+      if (h12Str.charAt(0) !== prevH.charAt(0)) animateTimeDigit(document.getElementById('timeH1'), h12Str.charAt(0));
+      if (h12Str.charAt(1) !== prevH.charAt(1)) animateTimeDigit(document.getElementById('timeH2'), h12Str.charAt(1));
+      if (mStr.charAt(0)   !== prevM.charAt(0)) animateTimeDigit(document.getElementById('timeM1'), mStr.charAt(0));
+      if (mStr.charAt(1)   !== prevM.charAt(1)) animateTimeDigit(document.getElementById('timeM2'), mStr.charAt(1));
+    }
+    document.getElementById('ampmDisplay').textContent = ampm;
+    lastH12 = h12; lastMin = m;
+    applySkyTheme();
+  }
+
+  var days = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+  if (d !== lastDay) {
+    var dayEl = document.getElementById('dayDisplay');
+    dayEl.textContent = days[d];
+    dayEl.classList.remove('day-transition'); void dayEl.offsetWidth; dayEl.classList.add('day-transition');
+    lastDay = d;
+    updateDate(now);
+  }
+
+  if (s !== lastSec) {
+    var offset = CIRC - (s / 60) * CIRC;
+    document.getElementById('secondsArc').style.strokeDashoffset = offset;
+    document.getElementById('secondsText').textContent = s < 10 ? '0' + s : '' + s;
+    lastSec = s;
+  }
+
+  updateNightMode(h);
+}
+
+function setDigit(id, val) {
+  var el = document.getElementById(id);
+  el.textContent = val; el.setAttribute('data-time', val);
+}
+
+function animateTimeDigit(el, newVal) {
+  el.classList.remove('digit-enter'); void el.offsetWidth;
+  el.classList.add('digit-exit');
+  setTimeout(function() {
+    el.textContent = newVal; el.setAttribute('data-time', newVal);
+    el.classList.remove('digit-exit'); void el.offsetWidth;
+    el.classList.add('digit-enter');
+  }, 200);
+}
+
+function updateDate(now) {
+  var months = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  var dNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var d = now.getDate(), mo = months[now.getMonth()], yr = now.getFullYear(), dn = dNames[now.getDay()];
+  var ord = function(n) { if (n>3&&n<21) return 'th'; var r=n%10; return r===1?'st':r===2?'nd':r===3?'rd':'th'; };
+  document.getElementById('monthYear').textContent = mo + ' ' + yr;
+  document.getElementById('dayNum').innerHTML = d + '<span class="date-ordinal">' + ord(d) + '</span>';
+  document.getElementById('dateFull').textContent = dn + ', ' + mo.charAt(0) + mo.slice(1).toLowerCase() + ' ' + d;
+}
+
+updateDate(new Date()); updateClock();
+setInterval(updateClock, 500);
+
+// ══════════════════════════════════════════════════════════════════════
+// NIGHT MODE
+// ══════════════════════════════════════════════════════════════════════
+var nightDimmed = false, wakeTimer = null;
+
+function updateNightMode(hour) {
+  var shouldDim = (hour >= 22 || hour < 6);
+  if (shouldDim && !nightDimmed) {
+    document.body.classList.add('night-dim');
+    document.getElementById('nightModeLabel').textContent = 'NIGHT MODE';
+    nightDimmed = true;
+  } else if (!shouldDim && nightDimmed && !wakeTimer) {
+    document.body.classList.remove('night-dim');
+    document.body.classList.remove('wake');
+    document.getElementById('nightModeLabel').textContent = 'LIVE';
+    nightDimmed = false;
+  }
+}
+
+document.body.addEventListener('click', function() {
+  if (!nightDimmed) return;
+  document.body.classList.add('wake');
+  clearTimeout(wakeTimer);
+  wakeTimer = setTimeout(function() { document.body.classList.remove('wake'); wakeTimer = null; }, 90000);
+});
+
+// ══════════════════════════════════════════════════════════════════════
+// WEATHER
+// ══════════════════════════════════════════════════════════════════════
+var WMO = {
+  0:{l:'Clear Sky',d:'clear-day',n:'clear-night'},1:{l:'Mostly Clear',d:'partly-cloudy-day',n:'partly-cloudy-night'},
+  2:{l:'Partly Cloudy',d:'partly-cloudy-day',n:'partly-cloudy-night'},3:{l:'Overcast',d:'overcast-day',n:'overcast-night'},
+  45:{l:'Foggy',d:'fog-day',n:'fog-night'},48:{l:'Icy Fog',d:'fog',n:'fog'},
+  51:{l:'Light Drizzle',d:'partly-cloudy-day-drizzle',n:'partly-cloudy-night-drizzle'},
+  53:{l:'Drizzle',d:'drizzle',n:'drizzle'},55:{l:'Heavy Drizzle',d:'overcast-drizzle',n:'overcast-drizzle'},
+  61:{l:'Light Rain',d:'partly-cloudy-day-rain',n:'partly-cloudy-night-rain'},63:{l:'Rain',d:'rain',n:'rain'},
+  65:{l:'Heavy Rain',d:'overcast-rain',n:'overcast-rain'},71:{l:'Light Snow',d:'partly-cloudy-day-snow',n:'partly-cloudy-night-snow'},
+  73:{l:'Snow',d:'snow',n:'snow'},75:{l:'Heavy Snow',d:'overcast-snow',n:'overcast-snow'},
+  77:{l:'Snow Grains',d:'snow',n:'snow'},80:{l:'Showers',d:'partly-cloudy-day-rain',n:'partly-cloudy-night-rain'},
+  81:{l:'Showers',d:'rain',n:'rain'},82:{l:'Heavy Showers',d:'thunderstorms-day-rain',n:'thunderstorms-night-rain'},
+  95:{l:'Thunderstorm',d:'thunderstorms-day',n:'thunderstorms-night'},99:{l:'Hail Storm',d:'hail',n:'hail'}
+};
+
+var ICON_BASE = 'https://cdn.jsdelivr.net/gh/basmilius/weather-icons@dev/production/fill/svg/';
+function getIconUrl(wmo, isDay) { if (!wmo) return ''; return ICON_BASE + (isDay ? (wmo.d||'clear-day') : (wmo.n||'clear-night')) + '.svg'; }
+function isDayTime() { var h = new Date().getHours(); return h >= 6 && h < 21; }
+function getWmoCode(obj) { return (obj.weather_code !== undefined && obj.weather_code !== null) ? obj.weather_code : obj.weathercode; }
+
+var toastTmr = null;
+function showToast(msg, dur) {
+  dur = dur || 3500;
+  var t = document.getElementById('geoToast');
+  document.getElementById('geoToastMsg').textContent = msg;
+  t.classList.add('show'); clearTimeout(toastTmr);
+  toastTmr = setTimeout(function() { t.classList.remove('show'); }, dur);
+}
+
+var activeLat = 37.4055, activeLon = -121.9081, activeCity = 'San Jose, CA';
+var prevTemp = null, weatherTimer = null;
+
+function fetchWeather() {
+  var wUrl = 'https://api.open-meteo.com/v1/forecast'
+    + '?latitude=' + activeLat + '&longitude=' + activeLon
+    + '&current=temperature_2m,apparent_temperature,weathercode,relative_humidity_2m,wind_speed_10m'
+    + '&daily=weathercode,temperature_2m_max,temperature_2m_min,uv_index_max'
+    + '&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto&forecast_days=6';
+  var aUrl = 'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=' + activeLat + '&longitude=' + activeLon + '&current=us_aqi&timezone=auto';
+
+  fetch(wUrl).then(function(r){return r.json();}).then(function(wd) {
+    var cur=wd.current, daily=wd.daily;
+    var tempC=Math.round(cur.temperature_2m), feelsC=Math.round(cur.apparent_temperature);
+    var code=getWmoCode(cur), humid=cur.relative_humidity_2m, wind=Math.round(cur.wind_speed_10m);
+    var wmo=WMO[code]||{l:'Unknown',d:'clear-day',n:'clear-night'};
+    var tEl=document.getElementById('tempValue');
+    if (prevTemp!==null && prevTemp!==tempC) { animateNumber(tEl,prevTemp,tempC,800); tEl.classList.remove('temp-flash'); void tEl.offsetWidth; tEl.classList.add('temp-flash'); }
+    else { tEl.textContent=tempC; }
+    prevTemp=tempC;
+    document.getElementById('feelsBadge').innerHTML='Feels <span>'+feelsC+'&deg;</span>';
+    var iconEl=document.getElementById('weatherIcon'); iconEl.src=getIconUrl(wmo,isDayTime()); iconEl.alt=wmo.l;
+    document.getElementById('weatherCondition').textContent=wmo.l;
+    document.getElementById('tempMeta').innerHTML='Humidity <strong style="color:var(--accent-warm)">'+humid+'%</strong>';
+    document.getElementById('windVal').textContent=wind+' km/h';
+    if (daily) {
+      document.getElementById('hlHigh').textContent='\u2191 '+Math.round(daily.temperature_2m_max[0])+'\u00b0';
+      document.getElementById('hlLow').textContent ='\u2193 '+Math.round(daily.temperature_2m_min[0])+'\u00b0';
+      setUV(daily.uv_index_max?daily.uv_index_max[0]:null);
+      updateForecastBrief(daily);
+    }
+    var n2=new Date(), hh=n2.getHours(), mm2=n2.getMinutes();
+    document.getElementById('lastUpdate').textContent=(hh<10?'0'+hh:hh)+':'+(mm2<10?'0'+mm2:mm2);
+  }).catch(function(e){ console.warn('Weather error:',e); document.getElementById('weatherCondition').textContent='Unavailable'; });
+
+  fetch(aUrl).then(function(r){return r.json();}).then(function(ad){
+    setAQI((ad.current&&ad.current.us_aqi!=null)?Math.round(ad.current.us_aqi):null);
+  }).catch(function(){setAQI(null);});
+}
+
+function setUV(uv) {
+  var el=document.getElementById('uvPill');
+  if (uv==null){el.textContent='\u2600 UV --';el.className='metric-pill mp-uv';return;}
+  var v=Math.round(uv),cls,label;
+  if(v>=11){cls='mp-uv-ext';label='Extreme';}else if(v>=8){cls='mp-uv-vhigh';label='Very High';}
+  else if(v>=6){cls='mp-uv-high';label='High';}else if(v>=3){cls='mp-uv-mod';label='Moderate';}
+  else{cls='mp-uv-low';label='Low';}
+  el.textContent='\u2600 UV '+v+' \u00b7 '+label; el.className='metric-pill '+cls;
+}
+
+function setAQI(aqi) {
+  var el=document.getElementById('aqiPill');
+  if(aqi==null){el.textContent='AQI --';el.className='metric-pill mp-aqi';return;}
+  var v=Math.round(aqi),cls,label;
+  if(v>300){cls='mp-aqi-haz';label='Hazardous';}else if(v>200){cls='mp-aqi-vun';label='Very Unhealthy';}
+  else if(v>150){cls='mp-aqi-un';label='Unhealthy';}else if(v>100){cls='mp-aqi-usg';label='Unhealthy\u00b7SG';}
+  else if(v>50){cls='mp-aqi-mod';label='Moderate';}else{cls='mp-aqi';label='Good';}
+  el.textContent='AQI '+v+' \u00b7 '+label; el.className='metric-pill '+cls;
+}
+
+function updateForecastBrief(daily) {
+  var items=generateForecastSummary(daily);
+  var container=document.getElementById('briefItems'); if(!container)return;
+  container.innerHTML='';
+  for(var j=0;j<items.length;j++){
+    var div=document.createElement('div'); div.className='brief-item';
+    div.innerHTML='<span class="brief-icon">'+items[j].icon+'</span><span class="brief-text">'+items[j].text+'</span>';
+    container.appendChild(div);
+  }
+}
+
+function generateForecastSummary(daily) {
+  var codes=daily.weather_code||daily.weathercode||[], highs=daily.temperature_2m_max||[];
+  var today=new Date(), dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  function dayLabel(o){if(o===1)return'tomorrow';var d=new Date(today);d.setDate(d.getDate()+o);return dayNames[d.getDay()];}
+  var todayHi=Math.round(highs[0]||0),peakVal=todayHi,peakIdx=0,troughVal=todayHi,troughIdx=0;
+  for(var i=1;i<highs.length;i++){var v=Math.round(highs[i]);if(v>peakVal){peakVal=v;peakIdx=i;}if(v<troughVal){troughVal=v;troughIdx=i;}}
+  var endHi=Math.round(highs[highs.length-1]||todayHi),trend=endHi-todayHi,days=highs.length-1;
+  var t1,i1;
+  if(Math.abs(trend)<2){i1='&#127777;&#65039;';t1='Temperatures <strong>steady</strong> around '+todayHi+'&deg;C this week';}
+  else if(trend>0){i1='&#128200;';t1='Warming <strong>+'+trend+'&deg;</strong> over '+days+' days';if(peakIdx>0&&peakIdx<highs.length-1)t1+=' &mdash; peaks at <strong>'+peakVal+'&deg;</strong> '+dayLabel(peakIdx);}
+  else{i1='&#128201;';t1='Cooling <strong>'+trend+'&deg;</strong> over '+days+' days';if(troughIdx>0&&troughIdx<highs.length-1)t1+=' &mdash; low of <strong>'+troughVal+'&deg;</strong> '+dayLabel(troughIdx);}
+  var rainDays=[],stormDays=[],snowDays=[];
+  for(var i=1;i<codes.length;i++){var code=codes[i]||0;if(code>=95)stormDays.push(dayLabel(i));else if(code>=71&&code<=77)snowDays.push(dayLabel(i));else if(code>=51)rainDays.push(dayLabel(i));}
+  var t2,i2;
+  if(stormDays.length>0){i2='&#9928;&#65039;';t2='<strong>Storms</strong> expected '+stormDays.join(', ');if(rainDays.length>0)t2+=' &bull; rain also '+rainDays.join(', ');}
+  else if(snowDays.length>0){i2='&#10052;&#65039;';t2='<strong>Snow</strong> forecast '+snowDays.join(' &amp; ');}
+  else if(rainDays.length>=3){i2='&#127783;&#65039;';t2='Rainy spell ahead &mdash; <strong>'+rainDays.length+' wet days</strong> ('+rainDays[0]+' through '+rainDays[rainDays.length-1]+')';}
+  else if(rainDays.length===2){i2='&#127782;&#65039;';t2='<strong>Rain likely</strong> '+rainDays[0]+' and '+rainDays[1];}
+  else if(rainDays.length===1){i2='&#127782;&#65039;';t2='Rain possible <strong>'+rainDays[0]+'</strong> &mdash; dry otherwise';}
+  else{i2='&#9728;&#65039;';t2='<strong>No rain</strong> expected &mdash; dry conditions for '+days+' days';}
+  var allHi=[],clearCnt=0;
+  for(var i=0;i<highs.length;i++)allHi.push(Math.round(highs[i]));
+  for(var i=1;i<codes.length;i++){if((codes[i]||0)<=1)clearCnt++;}
+  var minHi=Math.min.apply(null,allHi),maxHi=Math.max.apply(null,allHi),spread=maxHi-minHi;
+  var wetDays=rainDays.length+stormDays.length+snowDays.length;
+  var t3,i3;
+  if(spread>=8){i3='&#128202;';t3='Wide swing this week &mdash; highs <strong>'+minHi+'&deg; to '+maxHi+'&deg;</strong>';}
+  else if(clearCnt>=4){i3='&#127780;&#65039;';t3='Predominantly sunny &mdash; <strong>'+clearCnt+' clear days</strong> in the outlook';}
+  else if(wetDays>=3){i3='&#127746;';t3='Unsettled stretch &mdash; highs mostly <strong>'+minHi+'&ndash;'+maxHi+'&deg;C</strong>';}
+  else if(spread<3){i3='&#9925;';t3='Consistent conditions &mdash; highs near <strong>'+Math.round((minHi+maxHi)/2)+'&deg;C</strong>';}
+  else{i3='&#9925;';t3='Mixed week ahead &mdash; highs <strong>'+minHi+'&deg; to '+maxHi+'&deg;C</strong>';}
+  return [{icon:i1,text:t1},{icon:i2,text:t2},{icon:i3,text:t3}];
+}
+
+function animateNumber(el, from, to, duration) {
   var start=null;
-  function step(ts){
-    if(!start)start=ts;
-    var t=Math.min((ts-start)/dur,1), e=t<.5?2*t*t:-1+(4-2*t)*t;
-    el.textContent=fmtDollar(from+(to-from)*e);
-    if(t<1)requestAnimationFrame(step);
-  }
+  function step(ts){if(!start)start=ts;var t=Math.min((ts-start)/duration,1);var e=t<0.5?2*t*t:-1+(4-2*t)*t;el.textContent=Math.round(from+(to-from)*e);if(t<1)requestAnimationFrame(step);}
   requestAnimationFrame(step);
 }
 
-// ══════════════════════════════════════════════
-// CLOCK (reused from tablet_dashboard)
-// ══════════════════════════════════════════════
-var lastSec=-1,lastMin=-1,lastDay=-1,lastH12=-1;
-
-function updateClock(){
-  var now=new Date(), h=now.getHours(),m=now.getMinutes(),s=now.getSeconds(),d=now.getDay();
-  var h12=h%12||12, ampm=h<12?'AM':'PM', mStr=m<10?'0'+m:''+m;
-  if(m!==lastMin){
-    var hStr=h12<10?'0'+h12:''+h12;
-    if(lastMin===-1){ setTD('th1',hStr.charAt(0));setTD('th2',hStr.charAt(1));setTD('tm1',mStr.charAt(0));setTD('tm2',mStr.charAt(1)); }
-    else {
-      var ph=lastH12<10?'0'+lastH12:''+lastH12, pm=lastMin<10?'0'+lastMin:''+lastMin;
-      if(hStr.charAt(0)!==ph.charAt(0))animTD('th1',hStr.charAt(0));
-      if(hStr.charAt(1)!==ph.charAt(1))animTD('th2',hStr.charAt(1));
-      if(mStr.charAt(0)!==pm.charAt(0))animTD('tm1',mStr.charAt(0));
-      if(mStr.charAt(1)!==pm.charAt(1))animTD('tm2',mStr.charAt(1));
-    }
-    document.getElementById('topAmpm').textContent='\u00a0'+ampm;
-    lastH12=h12;lastMin=m;
-    var days=['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
-    var months=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
-    document.getElementById('topDay').textContent=days[d];
-    document.getElementById('topDate').textContent=months[now.getMonth()]+' '+now.getDate()+', '+now.getFullYear();
-    lastDay=d;
-  }
-  lastSec=s;
+// ══════════════════════════════════════════════════════════════════════
+// LOCATION
+// ══════════════════════════════════════════════════════════════════════
+function applyLocation(lat, lon, city) {
+  activeLat=lat; activeLon=lon; activeCity=city; prevTemp=null;
+  document.getElementById('locationText').textContent=city;
+  document.getElementById('tempLabel').textContent=city.toUpperCase();
+  clearInterval(weatherTimer); fetchWeather();
+  weatherTimer=setInterval(fetchWeather, 10*60*1000);
 }
-function setTD(id,v){var e=document.getElementById(id);if(e)e.textContent=v;}
-function animTD(id,v){
-  var e=document.getElementById(id);if(!e)return;
-  e.style.opacity='0';e.style.transform='translateY(-4px)';
-  setTimeout(function(){e.textContent=v;e.style.transition='opacity .25s,transform .25s';e.style.opacity='1';e.style.transform='translateY(0)';setTimeout(function(){e.style.transition='';},300);},120);
-}
-updateClock();setInterval(updateClock,500);
 
-// ══════════════════════════════════════════════
-// WEATHER
-// ══════════════════════════════════════════════
-var geoLat=37.4055, geoLon=-121.9081;
-var WMO={0:'Clear Sky',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Foggy',51:'Light Drizzle',53:'Drizzle',61:'Light Rain',63:'Rain',65:'Heavy Rain',71:'Light Snow',73:'Snow',80:'Showers',95:'Thunderstorm'};
-
-function fetchWeather(){
-  fetch('https://api.open-meteo.com/v1/forecast?latitude='+geoLat+'&longitude='+geoLon+'&current=temperature_2m,weathercode&temperature_unit=celsius&timezone=auto')
+function reverseGeocode(lat, lon, callback) {
+  fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lon+'&format=json&zoom=10',{headers:{'Accept-Language':'en'}})
     .then(function(r){return r.json();})
-    .then(function(d){
-      var cur=d.current;
-      document.getElementById('topTemp').textContent=Math.round(cur.temperature_2m)+'\u00b0C';
-      var code=cur.weather_code!==undefined?cur.weather_code:cur.weathercode;
-      document.getElementById('topCondition').textContent=WMO[code]||'';
-    }).catch(function(){});
+    .then(function(data){var a=data.address||{};var city=a.city||a.town||a.village||a.county||'Unknown';var st=a.state_code||a.state||'';callback(st?city+', '+st:city);})
+    .catch(function(){callback(lat.toFixed(2)+'\u00b0, '+lon.toFixed(2)+'\u00b0');});
 }
 
-function tryGeo(){
-  if(!navigator.geolocation)return;
-  navigator.geolocation.getCurrentPosition(function(pos){
-    geoLat=Math.round(pos.coords.latitude*10000)/10000;
-    geoLon=Math.round(pos.coords.longitude*10000)/10000;
-    fetch('https://nominatim.openstreetmap.org/reverse?lat='+geoLat+'&lon='+geoLon+'&format=json&zoom=10',{headers:{'Accept-Language':'en'}})
-      .then(function(r){return r.json();})
-      .then(function(data){
-        var a=data.address||{}, city=a.city||a.town||a.village||'Unknown', st=a.state_code||'';
-        document.getElementById('topLocation').textContent='\ud83d\udccd '+(st?city+', '+st:city);
-        fetchWeather();
-      }).catch(function(){fetchWeather();});
-  },function(){},{timeout:10000,maximumAge:300000});
+var geoHardTimer = null;
+function tryGeolocation() {
+  if(!navigator.geolocation){showToast('Geolocation not supported');return;}
+  showToast('Detecting location\u2026',7000);
+  clearTimeout(geoHardTimer);
+  geoHardTimer=setTimeout(function(){geoHardTimer=null;showToast('Location timed out');document.getElementById('locationText').textContent=activeCity;},15000);
+  navigator.geolocation.getCurrentPosition(
+    function(pos){
+      clearTimeout(geoHardTimer);geoHardTimer=null;
+      var lat=Math.round(pos.coords.latitude*10000)/10000, lon=Math.round(pos.coords.longitude*10000)/10000;
+      reverseGeocode(lat,lon,function(city){applyLocation(lat,lon,city);showToast('Location: '+city);});
+    },
+    function(err){clearTimeout(geoHardTimer);geoHardTimer=null;console.warn('Geo error',err.code,err.message);showToast('Location unavailable \u2014 using '+activeCity);document.getElementById('locationText').textContent=activeCity;},
+    {timeout:10000,maximumAge:300000,enableHighAccuracy:false}
+  );
 }
-fetchWeather();setInterval(fetchWeather,10*60*1000);tryGeo();
+function initLocation(){tryGeolocation();}
 
-// ══════════════════════════════════════════════
-// SETUP MODAL
-// ══════════════════════════════════════════════
-var stockInputList = document.getElementById('stockInputList');
-
-function addStockRow(symbol,shares){
-  var row=document.createElement('div');row.className='stock-row';
-  row.innerHTML='<input class="inp-ticker" type="text" placeholder="AAPL" maxlength="8" value="'+(symbol||'')+'" />'
-    +'<span class="inp-label">&#215;</span>'
-    +'<input class="inp-shares" type="number" placeholder="Shares" min="0.001" step="any" value="'+(shares||'')+'" />'
-    +'<button class="btn-remove" title="Remove">&#215;</button>';
-  row.querySelector('.inp-ticker').addEventListener('input',function(){this.value=this.value.toUpperCase();});
-  row.querySelector('.btn-remove').addEventListener('click',function(){if(stockInputList.children.length>1)stockInputList.removeChild(row);});
-  stockInputList.appendChild(row);
-}
-
-document.getElementById('btnAddStock').addEventListener('click',function(){
-  addStockRow('','');
-  var rows=stockInputList.querySelectorAll('.inp-ticker');rows[rows.length-1].focus();
-});
-
-document.getElementById('btnSave').addEventListener('click',function(){
-  var rows=stockInputList.querySelectorAll('.stock-row'), result=[], err='';
-  for(var i=0;i<rows.length;i++){
-    var tick=rows[i].querySelector('.inp-ticker').value.trim().toUpperCase();
-    var sh=parseFloat(rows[i].querySelector('.inp-shares').value);
-    if(!tick){err='Please enter a ticker symbol for each row.';break;}
-    if(!sh||sh<=0){err='Please enter a valid share count for '+tick+'.';break;}
-    result.push({symbol:tick,shares:sh});
-  }
-  if(!result.length)err='Please add at least one stock.';
-  if(err){var e=document.getElementById('setupError');e.textContent=err;e.style.display='block';return;}
-  portfolio=result;savePortfolio(portfolio);
-  var k=(document.getElementById('finnhubKey').value||'').trim();
-  if(k){finnhubKey=k;localStorage.setItem(FINHUB_KEY_ST,k);}
-  showDashboard();
-});
-
-document.getElementById('btnEdit').addEventListener('click',function(){showSetup(true);});
-
-function showSetup(prefill){
-  stockInputList.innerHTML='';
-  if(prefill&&portfolio.length) portfolio.forEach(function(p){addStockRow(p.symbol,p.shares);});
-  else{addStockRow('','');addStockRow('','');}
-  var ke=document.getElementById('finnhubKey');if(ke)ke.value=finnhubKey||'';
-  document.getElementById('setupError').style.display='none';
-  document.getElementById('setupOverlay').style.display='flex';
-  document.getElementById('mainDashboard').style.display='none';
-}
-
-function showDashboard(){
-  document.getElementById('setupOverlay').style.display='none';
-  document.getElementById('mainDashboard').style.display='grid';
-  renderTableSkeleton();
-  fetchStockPrices();
-  fetchIndices();
-  fetchFearGreed();
-  clearInterval(fetchTimer);
-  fetchTimer=setInterval(function(){fetchStockPrices();fetchIndices();fetchFearGreed();},REFRESH_MS);
-}
-
-// Currency selector
-document.getElementById('currencySel').value = activeCurrency;
-document.getElementById('currencySel').addEventListener('change',function(){
-  activeCurrency = this.value;
-  localStorage.setItem(CURRENCY_KEY, activeCurrency);
-  reRenderAll();
-});
-
-// ══════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════
 // BOOT
-// ══════════════════════════════════════════════
-var savedKey = localStorage.getItem(FINHUB_KEY_ST);
-if (savedKey) finnhubKey = savedKey;
-fetchExchangeRates();
-setInterval(fetchExchangeRates, 60*60*1000); // refresh rates hourly
-
-var saved = loadPortfolio();
-if (saved && saved.length) { portfolio=saved; showDashboard(); }
-else { showSetup(false); addStockRow('AAPL',''); addStockRow('TSLA',''); }
-
-// ── PWA Service Worker ──────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('stock_sw.js')
-      .then(function(r){ console.log('SW registered:', r.scope); })
-      .catch(function(e){ console.warn('SW failed:', e); });
-  });
-}
+// ══════════════════════════════════════════════════════════════════════
+initSky();
+applyLocation(37.4055, -121.9081, 'San Jose, CA');
+tryGeolocation();
 </script>
 </body>
 </html>
