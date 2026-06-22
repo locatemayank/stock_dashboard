@@ -117,7 +117,10 @@
     /* ── Portfolio section ── */
     .portfolio-section { display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 0 10px; }
     .pf-label { font-size:10px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px; }
-    .pf-total { font-family:'Orbitron',monospace;font-size:clamp(44px,8vw,110px);font-weight:900;letter-spacing:.02em;line-height:1;color:var(--text-primary);text-shadow:0 0 40px rgba(79,195,247,.3);transition:color .5s ease; }
+    .pf-total { font-family:'Orbitron',monospace;font-size:clamp(44px,8vw,110px);font-weight:900;letter-spacing:.02em;line-height:1;color:var(--text-primary);text-shadow:0 0 40px rgba(79,195,247,.3);transition:color .5s ease;
+      width:100%;text-align:center;
+      font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+    }
     .pf-total.up   { color:#a5d6a7;text-shadow:0 0 40px rgba(105,240,174,.3); }
     .pf-total.down { color:#ef9a9a;text-shadow:0 0 40px rgba(239,83,80,.25); }
     .pf-change { font-size:clamp(13px,1.8vw,20px);font-weight:500;margin-top:4px;letter-spacing:.05em; }
@@ -275,7 +278,7 @@
       /* Portfolio: more breathing room */
       .portfolio-section{padding:12px 0 16px;border-bottom:1px solid rgba(255,255,255,.06);}
       .pf-label{font-size:9px;letter-spacing:.2em;}
-      .pf-total{font-size:clamp(36px,12vw,64px);}
+      .pf-total{font-size:clamp(36px,12vw,64px);width:100%;text-align:center;}
       .pf-change{font-size:clamp(12px,3.8vw,16px);margin-top:6px;}
       .pf-meta{gap:8px;margin-top:12px;}
       .pf-meta-chip{padding:3px 12px;}
@@ -1021,8 +1024,7 @@ function updatePortfolioTotal() {
   var totalEl=document.getElementById('pfTotal'), changeEl=document.getElementById('pfChange');
   if(!totals.hasPrices){ totalEl.textContent='--';changeEl.innerHTML='Fetching prices\u2026';changeEl.className='pf-change flat';return; }
   var newVal=totals.value;
-  if(prevTotalValue!==null&&Math.abs(newVal-prevTotalValue)>0.01) animateVal(totalEl,prevTotalValue,newVal,800);
-  else totalEl.textContent=fmtDollar(newVal);
+  totalEl.textContent=fmtDollar(newVal);
   prevTotalValue=newVal;
   totalEl.className='pf-total'+(totals.change>0.01?' up':totals.change<-0.01?' down':'');
   changeEl.className='pf-change'+(totals.change>0.01?' up':totals.change<-0.01?' down':' flat');
