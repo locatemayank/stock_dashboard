@@ -559,16 +559,30 @@ function parseYahooChart(symbol, data) {
   return { symbol:symbol, price:curr, change:curr-prev, changePct:prev?((curr-prev)/prev*100):0, prevClose:prev, name:meta.shortName||meta.longName||symbol, state:meta.marketState||'CLOSED', error:false };
 }
 
+// Resolves with the FIRST promise that succeeds; rejects only if ALL fail
+function raceFirstSuccess(promises) {
+  return new Promise(function(resolve, reject) {
+    var failed = 0, total = promises.length;
+    promises.forEach(function(p) {
+      Promise.resolve(p)
+        .then(function(val) { resolve(val); })   // first success wins
+        .catch(function() {
+          failed++;
+          if (failed >= total) reject(new Error('All sources failed'));
+        });
+    });
+  });
+}
+
+// Both Yahoo proxies race — first valid response wins
 function fetchYahooSingle(symbol) {
   var chartUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + symbol + '?range=1d&interval=1d';
-  return fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(chartUrl))
-    .then(function(r){ if(!r.ok)throw new Error(r.status); return r.json(); })
-    .then(function(d){ return parseYahooChart(symbol, d); })
-    .catch(function() {
-      return fetch('https://corsproxy.io/?' + chartUrl)
-        .then(function(r){ return r.json(); })
-        .then(function(d){ return parseYahooChart(symbol, d); });
-    });
+  var parse = function(d) { return parseYahooChart(symbol, d); };
+  var p1 = fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(chartUrl))
+    .then(function(r){ if(!r.ok)throw new Error(r.status); return r.json(); }).then(parse);
+  var p2 = fetch('https://corsproxy.io/?' + chartUrl)
+    .then(function(r){ if(!r.ok)throw new Error(r.status); return r.json(); }).then(parse);
+  return raceFirstSuccess([p1, p2]);
 }
 
 function fetchFinnhubSingle(symbol) {
@@ -582,11 +596,11 @@ function fetchFinnhubSingle(symbol) {
     });
 }
 
+// Race ALL available sources — Finnhub + both Yahoo proxies simultaneously
 function fetchOneSafe(symbol) {
-  var fn = finnhubKey ? fetchFinnhubSingle(symbol) : fetchYahooSingle(symbol);
-  return fn.catch(function(e) {
-    console.warn(symbol, e.message);
-    if (finnhubKey) return fetchYahooSingle(symbol).catch(function(){ return {symbol:symbol,error:true}; });
+  var sources = [fetchYahooSingle(symbol)];
+  if (finnhubKey) sources.push(fetchFinnhubSingle(symbol));
+  return raceFirstSuccess(sources).catch(function() {
     return {symbol:symbol, error:true};
   });
 }
@@ -764,20 +778,34 @@ function renderFNG(score, rating) {
 function fetchStockPrices() {
   if (!portfolio.length) return;
 
-  var stockPromises  = portfolio.map(function(p){ return fetchOneSafe(p.symbol); });
+  // Start metrics in parallel (background — doesn't block price display)
   var metricPromises = portfolio.map(function(p){ return fetchFinnhubMetrics(p.symbol); });
 
-  Promise.all(stockPromises).then(function(results) {
-    var any = false;
-    results.forEach(function(r){ priceData[r.symbol]=r; if(!r.error)any=true; });
-    // Wait for metrics too
-    Promise.all(metricPromises).then(function() {
+  // Render each stock immediately as its price arrives
+  var pending = portfolio.length, anySuccess = false;
+
+  portfolio.forEach(function(p) {
+    fetchOneSafe(p.symbol).then(function(r) {
+      priceData[r.symbol] = r;
+      if (!r.error) anySuccess = true;
+      pending--;
+
+      // Show partial results immediately — don't wait for all
       renderTable();
       updatePortfolioTotal();
-      renderPfMeta();
-      var now=new Date(), hh=now.getHours(), mm=now.getMinutes();
-      document.getElementById('lastUpdate').textContent = (hh<10?'0'+hh:hh)+':'+(mm<10?'0'+mm:mm);
-      if (!any) document.getElementById('lastUpdate').textContent = 'Failed \u2014 add Finnhub key or retry';
+
+      if (pending === 0) {
+        // All prices done — apply metrics once ready
+        Promise.all(metricPromises).then(function() {
+          renderTable();
+          renderPfMeta();
+          renderConsensus();
+        });
+        var now=new Date(), hh=now.getHours(), mm=now.getMinutes();
+        document.getElementById('lastUpdate').textContent =
+          anySuccess ? (hh<10?'0'+hh:hh)+':'+(mm<10?'0'+mm:mm)
+                     : 'Failed \u2014 add Finnhub key or retry';
+      }
     });
   });
 }
