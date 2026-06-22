@@ -466,6 +466,11 @@ var indexPrices = {};  // {SPY:{changePct},QQQ:{changePct},DIA:{changePct}}
 var finnhubKey  = '';
 var fetchTimer  = null;
 var REFRESH_MS  = 5 * 60 * 1000;
+// Real-time WebSocket
+var ws              = null;
+var wsRenderTimer   = null;
+var wsReconnectTimer= null;
+var wsConnected     = false;
 
 // ══════════════════════════════════════════════
 // CURRENCY
@@ -592,7 +597,8 @@ function fetchFinnhubSingle(symbol) {
     .then(function(q) {
       if (!q||!q.c) throw new Error('No price');
       var curr=q.c, prev=q.pc||0;
-      return { symbol:symbol, price:curr, change:q.d||(curr-prev), changePct:q.dp||(prev?(curr-prev)/prev*100:0), prevClose:prev, name:symbol, state:q.t>0?'REGULAR':'CLOSED', error:false };
+      // Use time-based market state (not q.t which is unreliable)
+      return { symbol:symbol, price:curr, change:q.d||(curr-prev), changePct:q.dp||(prev?(curr-prev)/prev*100:0), prevClose:prev, name:symbol, state:getMarketStatusByTime(), error:false };
     });
 }
 
@@ -645,6 +651,80 @@ function fetchOneRecommendation(symbol) {
         renderConsensus(); // update score + distribution
       }
     }).catch(function(){});
+}
+
+// ══════════════════════════════════════════════
+// REAL-TIME WEBSOCKET (Finnhub)
+// Pushes trades instantly during market hours
+// ══════════════════════════════════════════════
+function connectWebSocket() {
+  if (!finnhubKey || !portfolio.length) return;
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  clearTimeout(wsReconnectTimer);
+  try {
+    ws = new WebSocket('wss://ws.finnhub.io?token=' + encodeURIComponent(finnhubKey));
+  } catch(e) { console.warn('WS create failed:', e); return; }
+
+  ws.onopen = function() {
+    wsConnected = true;
+    console.log('WS connected');
+    // Subscribe all portfolio symbols + index ETFs
+    var syms = portfolio.map(function(p){return p.symbol;}).concat(['SPY','QQQ','DIA']);
+    syms.forEach(function(sym) {
+      ws.send(JSON.stringify({type:'subscribe', symbol:sym}));
+    });
+  };
+
+  ws.onmessage = function(evt) {
+    try {
+      var msg = JSON.parse(evt.data);
+      if (msg.type !== 'trade' || !msg.data || !msg.data.length) return;
+      var updated = false;
+      msg.data.forEach(function(trade) {
+        var sym = trade.s, price = trade.p;
+        if (!price || !sym) return;
+        var pd = priceData[sym];
+        if (pd && !pd.error) {
+          var prev = pd.prevClose || price;
+          pd.price     = price;
+          pd.change    = price - prev;
+          pd.changePct = prev ? ((price - prev) / prev * 100) : 0;
+          updated = true;
+        }
+      });
+      if (updated && !wsRenderTimer) {
+        // Throttle UI updates to max 10×/sec so phone GPU doesn't struggle
+        wsRenderTimer = setTimeout(function() {
+          wsRenderTimer = null;
+          renderTable();
+          updatePortfolioTotal();
+        }, 100);
+      }
+    } catch(e){}
+  };
+
+  ws.onerror = function() { console.warn('WS error'); };
+
+  ws.onclose = function() {
+    ws = null; wsConnected = false;
+    // Auto-reconnect after 5 s
+    wsReconnectTimer = setTimeout(connectWebSocket, 5000);
+  };
+}
+
+function disconnectWebSocket() {
+  clearTimeout(wsReconnectTimer);
+  clearTimeout(wsRenderTimer);
+  if (ws) { ws.onclose = null; ws.close(); ws = null; }
+  wsConnected = false;
+}
+
+function resubscribeWebSocket() {
+  // Call after portfolio changes
+  if (!ws || ws.readyState !== WebSocket.OPEN) { connectWebSocket(); return; }
+  portfolio.forEach(function(p) {
+    ws.send(JSON.stringify({type:'subscribe', symbol:p.symbol}));
+  });
 }
 
 function fetchAllRecommendations() {
@@ -728,10 +808,31 @@ function fetchFinnhubMetrics(symbol) {
     }).catch(function(){});
 }
 
+// ── Market status: calculated from current ET time (not from API) ──────────
+function getMarketStatusByTime() {
+  // Convert current time to US Eastern (handles DST automatically)
+  var now = new Date();
+  var etStr = now.toLocaleString('en-US', {timeZone: 'America/New_York'});
+  var et = new Date(etStr);
+  var day = et.getDay();   // 0=Sun, 6=Sat
+  var hm  = et.getHours() * 60 + et.getMinutes();
+
+  if (day === 0 || day === 6) return 'CLOSED';  // weekend
+
+  if (hm <  4*60)            return 'CLOSED';   // before 4:00am ET
+  if (hm <  9*60+30)         return 'PRE';      // 4:00am–9:30am ET pre-market
+  if (hm < 16*60)            return 'REGULAR';  // 9:30am–4:00pm ET regular
+  if (hm < 20*60)            return 'POST';     // 4:00pm–8:00pm ET after-hours
+  return 'CLOSED';
+}
+
 // ── Indices (SPY=S&P500, QQQ=NASDAQ, DIA=DOW) ──
 var INDEX_MAP = { SPY:'S&P 500', QQQ:'NASDAQ', DIA:'DOW' };
 
 function fetchIndices() {
+  // Update market status from time immediately (don't wait for API)
+  updateMarketStatus(getMarketStatusByTime());
+
   ['SPY','QQQ','DIA'].forEach(function(sym) {
     fetchOneSafe(sym).then(function(r) {
       if (!r.error) {
@@ -742,8 +843,6 @@ function fetchIndices() {
           el.innerHTML = sign + '&nbsp;' + (r.changePct >= 0 ? '+' : '') + r.changePct.toFixed(2) + '%';
           el.className = 'idx-chg idx-' + cls;
         }
-        // Also update market status from SPY
-        if (sym === 'SPY') updateMarketStatus(r.state);
       }
     });
   });
@@ -986,7 +1085,7 @@ function animateVal(el, from, to, dur) {
 // ══════════════════════════════════════════════
 // CLOCK (reused from tablet_dashboard)
 // ══════════════════════════════════════════════
-var lastSec=-1,lastMin=-1,lastDay=-1,lastH12=-1;
+var lastSec=-1,lastMin=-1,lastDay=-1,lastH12=-1,lastMktMin=-1;
 
 function updateClock(){
   var now=new Date(), h=now.getHours(),m=now.getMinutes(),s=now.getSeconds(),d=now.getDay();
@@ -1003,6 +1102,8 @@ function updateClock(){
     }
     document.getElementById('topAmpm').textContent='\u00a0'+ampm;
     lastH12=h12;lastMin=m;
+    // Update market status once per minute (minute changed)
+    updateMarketStatus(getMarketStatusByTime());
     var days=['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
     var months=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
     document.getElementById('topDay').textContent=days[d];
@@ -1093,6 +1194,7 @@ document.getElementById('btnSave').addEventListener('click',function(){
 document.getElementById('btnEdit').addEventListener('click',function(){showSetup(true);});
 
 function showSetup(prefill){
+  disconnectWebSocket();  // pause real-time while editing
   stockInputList.innerHTML='';
   if(prefill&&portfolio.length) portfolio.forEach(function(p){addStockRow(p.symbol,p.shares);});
   else{addStockRow('','');addStockRow('','');}
@@ -1109,8 +1211,11 @@ function showDashboard(){
   fetchStockPrices();
   fetchIndices();
   fetchFearGreed();
-  // Fetch analyst ratings (staggered, refreshes every 30 min)
+  // Connect WebSocket for real-time updates (Finnhub key required)
+  setTimeout(connectWebSocket, 1000);
+  // Analyst ratings
   setTimeout(fetchAllRecommendations, 2000);
+  // HTTP polling as fallback / market-closed refresh
   clearInterval(fetchTimer);
   fetchTimer=setInterval(function(){fetchStockPrices();fetchIndices();fetchFearGreed();},REFRESH_MS);
   setInterval(fetchAllRecommendations, 30*60*1000);
@@ -1135,6 +1240,21 @@ setInterval(fetchExchangeRates, 60*60*1000); // refresh rates hourly
 var saved = loadPortfolio();
 if (saved && saved.length) { portfolio=saved; showDashboard(); }
 else { showSetup(false); addStockRow('AAPL',''); addStockRow('TSLA',''); }
+
+// ── Page visibility: reconnect WebSocket when app returns to foreground ──
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) {
+    // App came back to foreground — ensure WS is alive and prices are fresh
+    if (finnhubKey && portfolio.length) {
+      connectWebSocket();
+    }
+    fetchStockPrices(); // immediate HTTP refresh too
+  } else {
+    // App went to background — WS stays connected (keeps prices live)
+    // but clear any pending render timer
+    clearTimeout(wsRenderTimer); wsRenderTimer = null;
+  }
+});
 
 // ── PWA Service Worker ──────────────────────────────────────────
 if ('serviceWorker' in navigator) {
