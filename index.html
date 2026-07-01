@@ -248,6 +248,14 @@
     .fc-disclaimer{font-size:8px;color:var(--text-dim);margin-top:8px;padding:6px 8px;background:rgba(255,183,77,.05);border:1px solid rgba(255,183,77,.12);border-radius:6px;line-height:1.45;letter-spacing:.02em;}
     .fc-override-badge{display:inline-block;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.25);border-radius:6px;color:var(--accent-cyan);font-size:8px;padding:1px 6px;margin-left:6px;vertical-align:middle;letter-spacing:.06em;}
 
+    /* ── Portfolio optimizer button ── */
+    .fc-opt-btn{flex:1;background:linear-gradient(135deg,rgba(255,183,77,.12),rgba(255,152,0,.08));border:1px solid rgba(255,183,77,.3);border-radius:8px;color:var(--accent-warm);font-family:'Orbitron',monospace;font-size:10px;font-weight:700;letter-spacing:.08em;padding:7px 10px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+    .fc-opt-btn:hover{box-shadow:0 0 14px rgba(255,183,77,.2);}
+    .fc-opt-btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none;}
+    .fc-opt-obj{flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:var(--text-sec);font-size:10px;padding:0 6px;outline:none;cursor:pointer;font-family:'Inter',sans-serif;}
+    .fc-opt-obj option{background:#0c1228;color:var(--text-primary);}
+    .fc-opt-bar{height:5px;border-radius:3px;background:rgba(79,195,247,.45);min-width:2px;display:inline-block;vertical-align:middle;}
+
     /* ── Forecast results header (distinct from settings) ── */
     .fc-results-hdr{font-size:8px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--accent-cyan);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
     .fc-results-hdr::before{content:'';flex:1;height:1px;background:rgba(0,229,255,.2);}
@@ -499,6 +507,14 @@
             </div>
           </div>
           <button class="fc-run-btn" id="fcRunBtn">&#9654; Run Forecast</button>
+          <!-- Weight optimizer -->
+          <div style="display:flex;gap:6px;margin-top:6px;align-items:stretch;">
+            <select class="fc-opt-obj" id="fcOptObjective">
+              <option value="success">Max Goal %</option>
+              <option value="median">Max Median</option>
+            </select>
+            <button class="fc-opt-btn" id="fcOptBtn">&#9889; Optimize Weights</button>
+          </div>
           <!-- Advanced assumptions (collapsible) -->
           <div class="fc-adv-toggle" id="fcAdvToggle">
             <span>&#9881; Advanced Assumptions</span><span class="fc-adv-arrow">&#9660;</span>
@@ -568,6 +584,10 @@
             </div>
             <div class="fc-disclaimer">&#9888; These are probabilistic estimates, not predictions. Historical regime statistics do not guarantee future outcomes. The model assumes returns are approximately Normal within each regime — actual tail events may be larger or more correlated than modelled.</div>
           </div>
+        </div>
+        <!-- Optimization results -->
+        <div class="fc-section" id="fcOptSection" style="display:none;">
+          <div id="fcOptResults"></div>
         </div>
       </div>
     </div>
@@ -1294,7 +1314,7 @@ function drawFanChart(canvas, pctiles, opts) {
 var fcState = {
   horizonYears: 20, monthlyContrib: 0, monthlyWithdraw: 0,
   equityPct: 100, targetValue: 10000000, nSims: 10000,
-  running: false, pctiles: null, successProb: null, initialValue: 0,
+  running: false, optRunning: false, pctiles: null, successProb: null, initialValue: 0,
   // Advanced assumption overrides
   returnBias: 0,       // %/yr shift applied to all equity regime means
   volScale:   1.0,     // multiplier on all regime standard deviations
@@ -1470,6 +1490,9 @@ function initForecastUI() {
       this.className='active';
     });
   });
+
+  // ── Weight optimizer ──
+  document.getElementById('fcOptBtn').addEventListener('click', runOptimization);
 }
 
 function onChartHover(evt){
@@ -1652,6 +1675,215 @@ function renderAssumptionsPanel(simParams) {
   if(body){body.classList.add('open');}
   var tog=document.getElementById('fcModelToggle');
   if(tog){tog.classList.add('open');}
+}
+
+/* ══════════════════════════════════════════════
+   21. PORTFOLIO WEIGHT OPTIMIZER
+   
+   Key insight: for a linear portfolio, the return is:
+     R_port = Σ(w_s × β_s) × R_market + 0.025×√Σ(w_s²) × ε
+   So we only need effective beta and effective idio vol per allocation —
+   no need to simulate each stock individually. This makes the search fast.
+   
+   CRN (Common Random Numbers): all allocations see the same market draws
+   (same PRNG seeds per path), making relative ranking very accurate even
+   with only 200 paths per allocation.
+   ══════════════════════════════════════════════ */
+var OPT_N_ALLOC  = 1000;  // random weight vectors to explore
+var OPT_N_PATHS  = 200;   // paths per mini-simulation
+var OPT_SEED_OFF = 80000; // seed offset → no overlap with main forecast seeds
+
+function sampleSimplex(n) {
+  // Uniform sample on (n-1)-simplex via exponential trick
+  var w = new Array(n), sum = 0;
+  for (var i = 0; i < n; i++) {
+    var u = xrf(); if (u < 1e-10) u = 1e-10;
+    w[i] = -Math.log(u); sum += w[i];
+  }
+  for (var i = 0; i < n; i++) w[i] /= sum;
+  return w;
+}
+
+function evalAlloc(weights, betas, opts, FCp) {
+  // Effective portfolio beta: Σ(w_s × β_s)
+  var effBeta = 0, sumWsq = 0;
+  for (var s = 0; s < weights.length; s++) {
+    effBeta += weights[s] * betas[s];
+    sumWsq  += weights[s] * weights[s];
+  }
+  // Effective idio vol: concentrated=0.025, equal-weight N stocks = 0.025/√N
+  var effIdio = 0.025 * Math.sqrt(sumWsq);
+  return runMiniSim(effBeta, effIdio, opts, FCp);
+}
+
+function runMiniSim(effBeta, effIdio, opts, FCp) {
+  var nP=opts.nPaths, nM=opts.nMonths;
+  var iv=opts.initialValue, mc=opts.monthlyContrib, mw=opts.monthlyWithdraw;
+  var ef=opts.equityFrac, tgt=opts.target;
+  var vals = new Float32Array(nP);
+
+  for (var path = 0; path < nP; path++) {
+    // CRN: fixed per-path seeds so all allocations see the same market draws
+    XS[0]=splitmix32(splitmix32((path+OPT_SEED_OFF)*0x9e3779b9+1));
+    XS[1]=splitmix32(splitmix32((path+OPT_SEED_OFF)*0x6c62272e+2));
+    XS[2]=splitmix32(splitmix32((path+OPT_SEED_OFF)*0xd1b54a32+3));
+    XS[3]=splitmix32(splitmix32((path+OPT_SEED_OFF)*0xf1357aea+4));
+
+    var reg=5, ri=xrf(), ci=0;
+    for (var i=0;i<6;i++){ci+=FCp.init[i];if(ri<=ci){reg=i;break;}}
+
+    var val=iv;
+    for (var m=0;m<nM;m++){
+      reg=xpick(reg);
+      var mkt=FCp.means[reg]+FCp.stds[reg]*xgauss();
+      var eq =effBeta*mkt + effIdio*xgauss();
+      var bd =FCp.bMeans[reg]+FCp.bStds[reg]*xgauss();
+      val=Math.max(val*(1+ef*eq+(1-ef)*bd)+mc-mw, 0);
+    }
+    vals[path]=val;
+  }
+
+  vals.sort();
+  var nP1=nP-1;
+  var median=vals[Math.round(0.50*nP1)];
+  var p25   =vals[Math.round(0.25*nP1)];
+  var p75   =vals[Math.round(0.75*nP1)];
+  var success=0;
+  if(tgt>0) for(var p2=0;p2<nP;p2++) if(vals[p2]>=tgt) success++;
+  return { median:median, p25:p25, p75:p75, successProb:tgt>0?success/nP:null };
+}
+
+function runOptimization() {
+  if (fcState.running || fcState.optRunning) return;
+
+  var totals = calcTotals();
+  if (!totals.hasPrices || totals.value <= 0) {
+    alert('Stock prices not yet loaded. Please wait and retry.');
+    return;
+  }
+
+  var stocks = portfolio.map(function(p) {
+    var pd=priceData[p.symbol], md=metricsData[p.symbol];
+    return {
+      symbol: p.symbol,
+      value: pd&&pd.price&&!pd.error ? p.shares*pd.price : 0,
+      beta:  (md&&md.beta!=null) ? parseFloat(md.beta) : 1.0
+    };
+  }).filter(function(s){ return s.value>0; });
+
+  if (stocks.length < 2) {
+    alert('Need at least 2 stocks with price data to optimize.');
+    return;
+  }
+
+  fcState.optRunning = true;
+  var btn = document.getElementById('fcOptBtn');
+  btn.disabled = true; btn.textContent = '\u23f3 Optimizing\u2026';
+
+  var sec = document.getElementById('fcOptSection');
+  sec.style.display = 'block';
+  document.getElementById('fcOptResults').innerHTML =
+    '<div style="text-align:center;padding:14px 8px;color:var(--text-dim);font-size:11px;">'
+    +'<span class="spinner"></span>Exploring '+OPT_N_ALLOC.toLocaleString()+' allocations\u2026</div>';
+
+  setTimeout(function() {
+    try {
+      var totalVal = stocks.reduce(function(s,x){return s+x.value;},0);
+      var betas    = stocks.map(function(s){return s.beta;});
+      var curW     = stocks.map(function(s){return s.value/totalVal;});
+      var FCp      = FCmod || FC;
+      var objective= document.getElementById('fcOptObjective').value;
+
+      var opts = {
+        nPaths: OPT_N_PATHS,
+        nMonths: fcState.horizonYears*12,
+        initialValue: totalVal,
+        monthlyContrib: fcState.monthlyContrib,
+        monthlyWithdraw: fcState.monthlyWithdraw,
+        equityFrac: fcState.equityPct/100,
+        target: fcState.targetValue
+      };
+
+      var curStats  = evalAlloc(curW, betas, opts, FCp);
+      var bestScore = objective==='success' ? (curStats.successProb||0) : curStats.median;
+      var bestW     = curW.slice();
+      var bestStats = curStats;
+
+      for (var a = 0; a < OPT_N_ALLOC; a++) {
+        var w  = sampleSimplex(stocks.length);
+        var st = evalAlloc(w, betas, opts, FCp);
+        var score = objective==='success' ? (st.successProb||0) : st.median;
+        if (score > bestScore) { bestScore=score; bestW=w.slice(); bestStats=st; }
+      }
+
+      renderOptResult(stocks, curW, bestW, curStats, bestStats, objective);
+
+    } catch(e) {
+      console.error('Optimization error:', e);
+      document.getElementById('fcOptResults').innerHTML =
+        '<div style="color:var(--accent-red);padding:10px;font-size:11px;">Error: '+e.message+'</div>';
+    }
+
+    fcState.optRunning = false;
+    btn.disabled = false; btn.textContent = '\u26a1 Optimize Weights';
+  }, 60);
+}
+
+function renderOptResult(stocks, curW, optW, curSt, optSt, objective) {
+  var medImp = curSt.median>0 ? ((optSt.median-curSt.median)/curSt.median*100).toFixed(1) : '0';
+  var spImp  = (curSt.successProb!=null&&optSt.successProb!=null)
+    ? Math.round((optSt.successProb-curSt.successProb)*100) : null;
+
+  var h = '';
+
+  // Current vs Optimal summary cards
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">';
+  ['Current','Optimal'].forEach(function(lbl,isOpt){
+    var st=isOpt?optSt:curSt;
+    var col=isOpt?'var(--accent-green)':'var(--accent-cyan)';
+    h += '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:8px 10px;">'
+      +'<div style="font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;">'+lbl+'</div>'
+      +'<div style="font-family:Orbitron,monospace;font-size:11px;color:'+col+';">'+fmtAxisY(st.median)+'</div>'
+      +(st.successProb!=null?'<div style="font-size:9px;color:var(--text-sec);margin-top:2px;">'+Math.round(st.successProb*100)+'% goal</div>':'')
+      +'</div>';
+  });
+  h += '</div>';
+
+  // Improvement badge
+  var imp = parseFloat(medImp);
+  if (imp > 0.5) {
+    h += '<div style="text-align:center;margin-bottom:10px;">'
+      +'<span style="background:rgba(105,240,174,.1);border:1px solid rgba(105,240,174,.25);border-radius:16px;padding:3px 10px;font-size:9px;color:var(--accent-green);font-weight:600;">'
+      +(spImp&&spImp>0?'+'+spImp+'% success · ':'')+'Median +'+medImp+'%</span></div>';
+  } else {
+    h += '<div style="text-align:center;margin-bottom:10px;font-size:9px;color:var(--text-dim);">Current allocation is near-optimal.</div>';
+  }
+
+  // Per-stock weight table
+  h += '<table class="fc-regime-table"><thead><tr>'
+    +'<th style="text-align:left;">Ticker</th><th>β</th><th>Now</th><th>Optimal</th><th>Δ</th>'
+    +'</tr></thead><tbody>';
+
+  stocks.forEach(function(s,i){
+    var cur=Math.round(curW[i]*100), opt=Math.round(optW[i]*100);
+    var delta=opt-cur;
+    var dCol=delta>2?'var(--accent-green)':delta<-2?'var(--accent-red)':'var(--text-dim)';
+    var barW=Math.max(2,Math.round(opt*1.5));
+    h += '<tr>'
+      +'<td style="color:var(--accent-cyan);font-family:Orbitron,monospace;font-size:9px;">'+s.symbol+'</td>'
+      +'<td style="color:var(--text-dim);">'+s.beta.toFixed(2)+'</td>'
+      +'<td>'+cur+'%</td>'
+      +'<td><div style="display:inline-flex;align-items:center;gap:4px;"><div class="fc-opt-bar" style="width:'+barW+'px;"></div>'+opt+'%</div></td>'
+      +'<td style="color:'+dCol+';font-weight:600;">'+(delta>0?'+':'')+delta+'%</td>'
+      +'</tr>';
+  });
+  h += '</tbody></table>';
+
+  h += '<div style="margin-top:8px;font-size:8px;color:var(--text-dim);line-height:1.45;">'
+    +'Searched '+OPT_N_ALLOC.toLocaleString()+' random allocations using per-stock beta with common market noise (CRN). '
+    +'⚠️ Rebalancing may trigger capital gains taxes. Not financial advice.</div>';
+
+  document.getElementById('fcOptResults').innerHTML = h;
 }
 
 /* ══════════════════════════════════════════════
