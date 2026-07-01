@@ -146,8 +146,8 @@
     .currency-sel option{background:#0c1228;color:var(--text-primary);font-family:'Inter',sans-serif;}
     .btn-edit{background:rgba(79,195,247,.07);border:1px solid rgba(79,195,247,.18);border-radius:10px;color:var(--accent-blue);font-size:11px;font-weight:500;padding:5px 14px;cursor:pointer;letter-spacing:.07em;transition:background .2s;}
     .btn-edit:hover{background:rgba(79,195,247,.16);}
-    .btn-forecast{background:rgba(105,240,174,.08);border:1px solid rgba(105,240,174,.25);border-radius:10px;color:var(--accent-green);font-size:11px;font-weight:600;padding:5px 14px;cursor:pointer;letter-spacing:.07em;transition:background .2s,box-shadow .2s;}
-    .btn-forecast:hover{background:rgba(105,240,174,.18);box-shadow:0 0 14px rgba(105,240,174,.2);}
+    .btn-forecast{background:rgba(79,195,247,.06);border:1px solid rgba(79,195,247,.18);border-radius:10px;color:var(--accent-blue);font-size:11px;font-weight:500;padding:5px 14px;cursor:pointer;letter-spacing:.06em;transition:background .2s,box-shadow .2s;}
+    .btn-forecast:hover{background:rgba(79,195,247,.14);box-shadow:0 0 12px rgba(79,195,247,.12);}
     .fade-in{animation:fadeIn 1s ease forwards;}
     @keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
     .spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(79,195,247,.2);border-top-color:var(--accent-cyan);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:5px;}
@@ -248,10 +248,16 @@
     .fc-disclaimer{font-size:8px;color:var(--text-dim);margin-top:8px;padding:6px 8px;background:rgba(255,183,77,.05);border:1px solid rgba(255,183,77,.12);border-radius:6px;line-height:1.45;letter-spacing:.02em;}
     .fc-override-badge{display:inline-block;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.25);border-radius:6px;color:var(--accent-cyan);font-size:8px;padding:1px 6px;margin-left:6px;vertical-align:middle;letter-spacing:.06em;}
 
+    /* ── Forecast results header (distinct from settings) ── */
+    .fc-results-hdr{font-size:8px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--accent-cyan);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+    .fc-results-hdr::before{content:'';flex:1;height:1px;background:rgba(0,229,255,.2);}
+    .fc-results-hdr::after{content:'';flex:1;height:1px;background:rgba(0,229,255,.2);}
+
     /* Responsive */
     @media(max-width:900px){
-      .fc-body{grid-template-columns:1fr;}
-      .fc-sidebar{max-height:220px;}
+      .fc-body{grid-template-columns:1fr;grid-template-rows:minmax(220px,45%) 1fr;gap:10px;}
+      .fc-sidebar{max-height:none;overflow-y:auto;}
+      .fc-chart-wrap{min-height:200px;}
     }
     @media(max-width:768px){
       .dashboard{padding:14px 18px 12px;}
@@ -259,19 +265,70 @@
       .td-name,.week52-bar{display:none;}
     }
     @media(max-width:600px),(max-width:700px) and (orientation:portrait){
-      .dashboard{height:100dvh;overflow:hidden;grid-template-rows:auto auto 1fr auto;padding:10px 14px 12px;gap:8px;}
+      /* ── Dashboard mobile fixes ── */
+      .dashboard{
+        height:100dvh;overflow:hidden;
+        grid-template-rows:auto auto 1fr auto;
+        padding:6px 12px 6px;gap:4px;
+      }
       .top-strip{display:none;}
-      .market-strip{flex-direction:column;align-items:center;padding:10px 0 12px;gap:10px;width:100%;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:0;}
-      .index-pills{display:flex;gap:6px;width:100%;justify-content:center;}
-      .index-pill{flex:1;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;gap:3px;min-width:0;background:rgba(255,255,255,.05);border-radius:14px;border:1px solid rgba(255,255,255,.09);}
-      .mkt-right{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;width:100%;}
-      .portfolio-section{padding:12px 0 16px;border-bottom:1px solid rgba(255,255,255,.06);}
-      .pf-total{font-size:clamp(36px,12vw,64px);}
-      .stock-table-wrap{border-radius:14px;}
+      /* Market strip: more compact */
+      .market-strip{
+        flex-direction:column;align-items:center;
+        padding:6px 0 8px;gap:6px;width:100%;
+        border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:0;
+      }
+      .index-pills{display:flex;gap:5px;width:100%;justify-content:center;}
+      .index-pill{flex:1;flex-direction:column;align-items:center;justify-content:center;padding:6px 4px;gap:2px;min-width:0;background:rgba(255,255,255,.05);border-radius:12px;border:1px solid rgba(255,255,255,.09);}
+      .mkt-right{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;width:100%;}
+      /* Portfolio: compact */
+      .portfolio-section{padding:6px 0 8px;border-bottom:1px solid rgba(255,255,255,.06);}
+      .pf-label{font-size:8px;margin-bottom:2px;}
+      .pf-total{font-size:clamp(30px,9.5vw,52px);}
+      .pf-change{font-size:clamp(11px,3.2vw,14px);margin-top:2px;}
+      .pf-meta{gap:6px;margin-top:4px;}
+      .pf-meta-chip{padding:2px 8px;}
+      .pf-meta-label{font-size:8px;letter-spacing:.12em;}
+      .pf-meta-val{font-size:11px;}
+      .pf-distrib{font-size:9px;margin-top:3px;gap:8px;}
+      /* Stock table */
+      .stock-table-wrap{border-radius:12px;overflow-y:auto;}
       .stock-table th:nth-child(2),.stock-table td:nth-child(2){display:none;}
       .td-name,.week52-bar{display:none;}
       .chg-full{display:none;}.chg-short{display:inline;}
-      .status-bar{flex-wrap:wrap;gap:6px;margin-top:6px;}
+      /* Status bar: ensure always visible */
+      .status-bar{
+        flex-wrap:nowrap;gap:6px;margin-top:4px;
+        padding:4px 0;min-height:32px;
+        align-items:center;
+      }
+      .status-right{gap:6px;flex-wrap:nowrap;align-items:center;}
+      .btn-edit,.btn-forecast{padding:6px 10px;font-size:10px;border-radius:8px;}
+      .currency-sel{font-size:10px;padding:5px 6px;}
+      .last-update{display:none;}/* hide on phone, saves space */
+
+      /* ── Forecast overlay mobile ── */
+      .fc-panel{padding:10px 12px 8px;gap:6px;}
+      .fc-title{font-size:14px;letter-spacing:.05em;}
+      .fc-body{
+        grid-template-rows:minmax(180px,38vh) 1fr;
+        gap:8px;
+        overflow:hidden;
+      }
+      .fc-chart-wrap{min-height:160px;}
+      .fc-sidebar{
+        max-height:none;
+        overflow-y:auto;
+        -webkit-overflow-scrolling:touch;
+        gap:8px;
+        padding-bottom:8px;
+      }
+      .fc-section{padding:10px 12px;}
+      .fc-section-label{margin-bottom:8px;font-size:8px;}
+      .fc-ctrl-row{margin-bottom:8px;}
+      .fc-ctrl-label{font-size:9px;}
+      .fc-seg button{font-size:10px;padding:4px 0;}
+      .fc-run-btn{padding:9px;font-size:11px;}
     }
   </style>
 </head>
@@ -419,7 +476,7 @@
           </div>
           <div class="fc-ctrl-row">
             <span class="fc-ctrl-label">Goal / Target Value</span>
-            <div class="fc-inp-wrap"><span class="fc-inp-sym">$</span><input type="number" id="fcTarget" value="1000000" min="0" step="50000" /></div>
+            <div class="fc-inp-wrap"><span class="fc-inp-sym">$</span><input type="number" id="fcTarget" value="10000000" min="0" step="1000000" /></div>
           </div>
           <div class="fc-ctrl-row">
             <span class="fc-ctrl-label">Simulations</span>
@@ -1222,7 +1279,7 @@ function drawFanChart(canvas, pctiles, opts) {
    ══════════════════════════════════════════════ */
 var fcState = {
   horizonYears: 20, monthlyContrib: 0, monthlyWithdraw: 0,
-  equityPct: 100, targetValue: 1000000, nSims: 10000,
+  equityPct: 100, targetValue: 10000000, nSims: 10000,
   running: false, pctiles: null, successProb: null, initialValue: 0,
   // Advanced assumption overrides
   returnBias: 0,       // %/yr shift applied to all equity regime means
