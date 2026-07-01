@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#00e5ff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PF Predictor" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
   <title>Portfolio Predictor</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;900&family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap');
@@ -54,7 +59,7 @@
     .btn-save:hover{box-shadow:0 0 20px rgba(0,229,255,.25);}
 
     /* ── MAIN DASHBOARD ── */
-    .dashboard{position:relative;z-index:2;width:100vw;height:100vh;display:grid;grid-template-rows:auto auto auto 1fr auto;padding:18px 40px 12px;gap:0;}
+    .dashboard{position:relative;z-index:2;width:100vw;height:100vh;display:grid;grid-template-rows:auto auto auto auto 1fr auto;padding:18px 40px 12px;gap:0;}
     .top-strip{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.07);}
     .top-time-wrap{display:flex;align-items:baseline;gap:3px;}
     .top-time{font-family:'Orbitron',monospace;font-size:clamp(58px,8.5vw,115px);font-weight:900;letter-spacing:.04em;line-height:1;background:linear-gradient(135deg,#e8f4fd,var(--accent-cyan) 50%,var(--accent-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-variant-numeric:tabular-nums;}
@@ -105,6 +110,35 @@
     @keyframes sPulse{0%,100%{opacity:1;}50%{opacity:.3;}}
     .pf-distrib{font-size:10px;letter-spacing:.06em;margin-top:6px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:center;}
     .pf-distrib .d-up{color:var(--accent-green);font-weight:600;}.pf-distrib .d-hold{color:#fff176;font-weight:600;}.pf-distrib .d-down{color:var(--accent-red);font-weight:600;}.pf-distrib .d-sep{color:var(--text-dim);}
+    /* ── BUBBLE DETECTOR ── */
+    .bubble-panel{background:var(--bg-card);border:1px solid rgba(255,255,255,.06);border-radius:14px;padding:0;margin-bottom:8px;overflow:hidden;backdrop-filter:blur(10px);}
+    .bubble-header{display:flex;align-items:center;justify-content:space-between;padding:7px 16px;cursor:pointer;user-select:none;border-bottom:1px solid rgba(255,255,255,.05);}
+    .bubble-header-left{display:flex;align-items:center;gap:8px;}
+    .bubble-title{font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--text-dim);}
+    .bubble-portfolio-score{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;border:1px solid;}
+    .bubble-score-ok{color:var(--accent-green);border-color:rgba(105,240,174,.3);background:rgba(105,240,174,.08);}
+    .bubble-score-warn{color:#fff176;border-color:rgba(255,238,88,.3);background:rgba(255,238,88,.06);}
+    .bubble-score-hot{color:var(--accent-warm);border-color:rgba(255,183,77,.3);background:rgba(255,183,77,.07);}
+    .bubble-score-danger{color:var(--accent-red);border-color:rgba(239,83,80,.3);background:rgba(239,83,80,.08);}
+    .bubble-score-extreme{color:#ff1744;border-color:rgba(255,23,68,.35);background:rgba(255,23,68,.1);}
+    .bubble-toggle{font-size:9px;color:var(--text-dim);transition:transform .25s;display:inline-block;}
+    .bubble-toggle.open{transform:rotate(180deg);}
+    .bubble-body{padding:4px 0;}
+    .bubble-row{display:flex;align-items:center;gap:10px;padding:5px 16px;border-bottom:1px solid rgba(255,255,255,.03);}
+    .bubble-row:last-child{border-bottom:none;}
+    .bubble-sym{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;color:var(--text-primary);min-width:52px;}
+    .bubble-bar-wrap{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden;}
+    .bubble-bar{height:100%;border-radius:3px;transition:width .6s ease;}
+    .bubble-bar-ok{background:var(--accent-green);}
+    .bubble-bar-warn{background:#fff176;}
+    .bubble-bar-hot{background:var(--accent-warm);}
+    .bubble-bar-danger{background:var(--accent-red);}
+    .bubble-bar-extreme{background:#ff1744;}
+    .bubble-score-num{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;min-width:28px;text-align:right;}
+    .bubble-label{font-size:9px;letter-spacing:.06em;min-width:74px;color:var(--text-sec);}
+    .bubble-suggestion{font-size:9px;color:var(--accent-warm);letter-spacing:.04em;flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .bubble-no-data{font-size:10px;color:var(--text-dim);text-align:center;padding:8px 0;letter-spacing:.1em;}
+    .bubble-bond-alert{font-size:9px;color:#b39ddb;padding:4px 16px 6px;letter-spacing:.06em;text-align:center;border-top:1px solid rgba(255,255,255,.04);}
     .stock-table-wrap{overflow-y:auto;overflow-x:hidden;background:var(--bg-card);border:1px solid rgba(255,255,255,.06);border-radius:18px;backdrop-filter:blur(10px);}
     .stock-table{width:100%;border-collapse:collapse;}
     .stock-table thead tr{background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.07);}
@@ -276,7 +310,7 @@
       /* ── Dashboard mobile fixes ── */
       .dashboard{
         height:100dvh;overflow:hidden;
-        grid-template-rows:auto auto 1fr auto;
+        grid-template-rows:auto auto auto 1fr auto;
         padding:6px 12px 6px;gap:4px;
       }
       .top-strip{display:none;}
@@ -419,6 +453,16 @@
       <div class="pf-meta-chip"><span class="pf-meta-label">&#9733; Consensus</span><span class="pf-meta-val" id="pfConsensus">--</span></div>
     </div>
     <div class="pf-distrib" id="pfDistrib"></div>
+  </div>
+  <div class="bubble-panel" id="bubblePanel">
+    <div class="bubble-header" id="bubbleHeader" onclick="toggleBubblePanel()">
+      <div class="bubble-header-left">
+        <span class="bubble-title">&#x1FAE7; Bubble Check</span>
+        <span class="bubble-portfolio-score bubble-score-ok" id="bubblePortfolioScore"></span>
+      </div>
+      <span class="bubble-toggle" id="bubbleToggle">&#9650;</span>
+    </div>
+    <div class="bubble-body" id="bubbleBody" style="display:none;"></div>
   </div>
   <div class="stock-table-wrap">
     <table class="stock-table">
@@ -610,7 +654,7 @@ var CURRENCY_KEY  = 'stockDash_currency_v1';
 function loadPortfolio(){try{var d=localStorage.getItem(STORAGE_KEY);return d?JSON.parse(d):null;}catch(e){return null;}}
 function savePortfolio(p){localStorage.setItem(STORAGE_KEY,JSON.stringify(p));}
 
-var portfolio=[];var priceData={};var metricsData={};var ratingsData={};var ratingChanges={};
+var portfolio=[];var priceData={};var metricsData={};var ratingsData={};var ratingChanges={};var fngScore=50;
 var finnhubKey='';var fetchTimer=null;var REFRESH_MS=5*60*1000;
 var ws=null;var wsRenderTimer=null;var wsReconnectTimer=null;var wsConnected=false;
 
@@ -738,6 +782,7 @@ function fetchFearGreed(){
   fetch('https://api.allorigins.win/raw?url='+encodeURIComponent('https://production.dataviz.cnn.io/index/fearandgreed/graphdata')).then(function(r){return r.json();}).then(function(d){if(d&&d.fear_and_greed)renderFNG(d.fear_and_greed.score,d.fear_and_greed.rating);}).catch(function(){});
 }
 function renderFNG(score,rating){
+  fngScore=score;
   var el=document.getElementById('fngBadge');if(!el)return;
   var cls='fng-unknown',emoji='\u{1F9E0}';
   if(score<=25){cls='fng-efear';emoji='\ud83d\ude28';}else if(score<=45){cls='fng-fear';emoji='\ud83d\ude15';}else if(score<=55){cls='fng-neutral';emoji='\ud83d\ude10';}else if(score<=75){cls='fng-greed';emoji='\ud83d\ude0f';}else{cls='fng-egreed';emoji='\ud83e\udd11';}
@@ -761,7 +806,7 @@ function fetchStockPrices(){
     fetchOneSafe(p.symbol).then(function(r){
       priceData[r.symbol]=r;if(!r.error)anySuccess=true;pending--;
       renderTable();updatePortfolioTotal();
-      if(pending===0){Promise.all(metricPromises).then(function(){renderTable();renderPfMeta();renderConsensus();});
+      if(pending===0){Promise.all(metricPromises).then(function(){renderTable();renderPfMeta();renderConsensus();renderBubblePanel();});
         var now=new Date(),hh=now.getHours(),mm=now.getMinutes();
         document.getElementById('lastUpdate').textContent=anySuccess?(hh<10?'0'+hh:hh)+':'+(mm<10?'0'+mm:mm):'Failed — add Finnhub key or retry';
       }
@@ -770,7 +815,86 @@ function fetchStockPrices(){
 }
 
 /* ══════════════════════════════════════════════
-   7. PORTFOLIO CALCULATIONS
+   BUBBLE DETECTOR
+   ══════════════════════════════════════════════ */
+function computeBubbleScore(symbol,weightPct){
+  var pd=priceData[symbol],md=metricsData[symbol];
+  if(!pd||!pd.price||pd.error)return null;
+  var price=pd.price;
+  var h52=md&&md.high52?md.high52:0;
+  var l52=md&&md.low52?md.low52:0;
+  var beta=md&&md.beta!=null?md.beta:1;
+  // Component 1: 52-week percentile (max 40 pts)
+  var pct52=0,rawPct=0;
+  if(h52>l52){rawPct=Math.min(Math.max((price-l52)/(h52-l52),0),1);pct52=rawPct*40;}
+  // Component 2: Portfolio concentration (max 25 pts)
+  var concPts=Math.min(weightPct,25);
+  // Component 3: Market sentiment via F&G (0/5/12/20 pts)
+  var fngPts=0;
+  if(fngScore<=25)fngPts=0;else if(fngScore<=55)fngPts=5;else if(fngScore<=75)fngPts=12;else fngPts=20;
+  // Component 4: Beta amplification (max 15 pts)
+  var betaPts=Math.min(15,Math.max(0,(beta-1.0)*10));
+  var total=Math.min(100,Math.round(pct52+concPts+fngPts+betaPts));
+  // Determine label & styling
+  var label,cls,barCls,suggestion='';
+  if(total<=25){label='\uD83D\uDFE2 Fair Value';cls='bubble-score-ok';barCls='bubble-bar-ok';}
+  else if(total<=50){label='\uD83D\uDFE1 Elevated';cls='bubble-score-warn';barCls='bubble-bar-warn';}
+  else if(total<=70){label='\uD83D\uDFE0 Overheated';cls='bubble-score-hot';barCls='bubble-bar-hot';suggestion='Monitor closely';}
+  else if(total<=85){label='\uD83D\uDD34 Bubble Risk';cls='bubble-score-danger';barCls='bubble-bar-danger';suggestion='Consider trim';}
+  else{label='\uD83D\uDEA8 Extreme';cls='bubble-score-extreme';barCls='bubble-bar-extreme';suggestion='Significant trim';}
+  // More specific override rules
+  if(weightPct>20&&total>50){suggestion='Trim \u2192 ~15% weight';}
+  if(rawPct>0.90&&fngScore>70){suggestion='Near peak + greed: trim 10\u201320%';}
+  if(beta>1.5&&fngScore>75&&weightPct>10){suggestion='High-\u03B2 in greed: hedge';}
+  return{score:total,label:label,cls:cls,barCls:barCls,suggestion:suggestion};
+}
+function toggleBubblePanel(){
+  var body=document.getElementById('bubbleBody'),tog=document.getElementById('bubbleToggle');
+  if(!body||!tog)return;
+  var open=body.style.display!=='none';
+  body.style.display=open?'none':'';
+  tog.className=open?'bubble-toggle':'bubble-toggle open';
+}
+function renderBubblePanel(){
+  var panel=document.getElementById('bubblePanel'),body=document.getElementById('bubbleBody');
+  var pscore=document.getElementById('bubblePortfolioScore');
+  if(!panel||!body)return;
+  if(!portfolio.length){body.innerHTML='<div class="bubble-no-data">No portfolio loaded.</div>';return;}
+  var tot=calcTotals(),totalVal=tot.value;
+  if(!totalVal){body.innerHTML='<div class="bubble-no-data">Prices loading\u2026</div>';return;}
+  var results=[];
+  portfolio.forEach(function(p){
+    var pd=priceData[p.symbol];if(!pd||!pd.price||pd.error)return;
+    var val=p.shares*pd.price,wt=totalVal>0?(val/totalVal*100):0;
+    var r=computeBubbleScore(p.symbol,wt);
+    if(r)results.push({symbol:p.symbol,wt:wt,r:r});
+  });
+  if(!results.length){body.innerHTML='<div class="bubble-no-data">Metric data loading\u2026</div>';return;}
+  var scores=results.map(function(x){return x.r.score;});
+  var avgScore=Math.round(scores.reduce(function(a,b){return a+b;},0)/scores.length);
+  // Header portfolio-wide score badge
+  var hcls='bubble-score-ok';
+  if(avgScore>85)hcls='bubble-score-extreme';else if(avgScore>70)hcls='bubble-score-danger';else if(avgScore>50)hcls='bubble-score-hot';else if(avgScore>25)hcls='bubble-score-warn';
+  if(pscore){pscore.className='bubble-portfolio-score '+hcls;pscore.textContent='Avg '+avgScore;}
+  // Sort by score descending
+  results.sort(function(a,b){return b.r.score-a.r.score;});
+  var html='';
+  results.forEach(function(x){
+    var r=x.r;
+    html+='<div class="bubble-row">'
+      +'<span class="bubble-sym">'+x.symbol+'</span>'
+      +'<div class="bubble-bar-wrap"><div class="bubble-bar '+r.barCls+'" style="width:'+r.score+'%"></div></div>'
+      +'<span class="bubble-score-num '+r.cls+'">'+r.score+'</span>'
+      +'<span class="bubble-label">'+r.label+'</span>'
+      +(r.suggestion?'<span class="bubble-suggestion">\u26A0\uFE0F '+r.suggestion+'</span>':'')
+      +'</div>';
+  });
+  if(avgScore>60){html+='<div class="bubble-bond-alert">\uD83D\uDCCA Portfolio avg risk >60 \u2014 consider increasing bond allocation</div>';}
+  body.innerHTML=html;
+}
+
+/* ══════════════════════════════════════════════
+   6. MAIN FETCH CYCLE
    ══════════════════════════════════════════════ */
 function calcTotals(){var val=0,chg=0,has=false;portfolio.forEach(function(p){var pd=priceData[p.symbol];if(pd&&pd.price&&!pd.error){val+=p.shares*pd.price;chg+=p.shares*pd.change;has=true;}});return{value:val,change:chg,hasPrices:has};}
 function calcPortfolioBeta(){
