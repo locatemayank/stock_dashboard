@@ -1,0 +1,52 @@
+{
+  "name": "Portfolio Predictor",
+  "short_name": "Portfolio",
+  "description": "Monte Carlo portfolio forecast with WebGPU acceleration. Predict your portfolio 5\u201330 years into the future using historical market regimes.",
+  "start_url": "/stock_dashboard/index.html",
+  "scope": "/stock_dashboard/",
+  "display": "standalone",
+  "background_color": "#02030c",
+  "theme_color": "#00e5ff",
+  "orientation": "any",
+  "lang": "en",
+  "categories": [
+    "finance",
+    "utilities",
+    "productivity"
+  ],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open Forecast",
+      "short_name": "Forecast",
+      "description": "Open the Monte Carlo forecast panel",
+      "url": "/stock_dashboard/index.html#forecast",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false
+}
