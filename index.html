@@ -558,7 +558,8 @@
           <!-- Weight optimizer -->
           <div style="display:flex;gap:6px;margin-top:6px;align-items:stretch;">
             <select class="fc-opt-obj" id="fcOptObjective">
-              <option value="median" selected>Max Median</option>
+              <option value="p25" selected>Balanced (Max p25)</option>
+              <option value="median">Max Median</option>
               <option value="success">Max Goal %</option>
             </select>
             <button class="fc-opt-btn" id="fcOptBtn">&#9889; Optimize Weights</button>
@@ -1854,6 +1855,24 @@ var OPT_N_PATHS      = 200;   // CRN paths per coarse mini-simulation
 var OPT_N_PATHS_FINE = 3000;  // CRN paths for final low-noise comparison
 var OPT_REFINE_ITERS = 250;   // local hill-climb steps around the best candidate
 var OPT_SEED_OFF     = 80000; // seed offset → no overlap with main forecast seeds
+var OPT_MAX_WEIGHT   = 0.40;  // hard cap on any single position (diversification)
+
+/* Project a weight vector so no single position exceeds `cap`, via iterative
+   water-filling: clip over-cap weights and redistribute the excess pro-rata to
+   the remaining (uncapped) positions, then renormalize. */
+function capWeights(w, cap){
+  var n=w.length, i, iter; w=w.slice();
+  for(iter=0; iter<12; iter++){
+    var excess=0, freeSum=0, capped=[];
+    for(i=0;i<n;i++){ if(w[i]>cap+1e-12){ excess+=w[i]-cap; w[i]=cap; capped[i]=true; } }
+    for(i=0;i<n;i++){ if(!capped[i]) freeSum+=w[i]; }
+    if(excess<=1e-9) break;
+    if(freeSum<=1e-9){ for(i=0;i<n;i++) w[i]+=excess/n; break; }
+    for(i=0;i<n;i++){ if(!capped[i]) w[i]+=excess*(w[i]/freeSum); }
+  }
+  var s=0; for(i=0;i<n;i++) s+=w[i]; if(s>0) for(i=0;i<n;i++) w[i]/=s;
+  return w;
+}
 
 function sampleSimplex(n) {
   // Uniform sample on (n-1)-simplex via exponential trick
@@ -1891,7 +1910,7 @@ function randomCandidate(n){
 /* Local hill-climb: repeatedly shift a little weight between two assets and
    keep the move if it improves the objective. Anneals the step size down.
    Uses CRN (same seeds) so score comparisons are apples-to-apples. */
-function refineAllocation(startW, betas, opts, FCp, scoreOf){
+function refineAllocation(startW, betas, opts, FCp, scoreOf, cap){
   var cur=startW.slice(), n=cur.length;
   var curScore=scoreOf(evalAlloc(cur,betas,opts,FCp));
   var step=0.25,i;
@@ -1907,6 +1926,7 @@ function refineAllocation(startW, betas, opts, FCp, scoreOf){
     var s=0; for(i=0;i<n;i++){ if(cand[i]<0)cand[i]=0; s+=cand[i]; }
     if(s<=0) continue;
     for(i=0;i<n;i++) cand[i]/=s;
+    if(cap) cand=capWeights(cand,cap);
     var sc=scoreOf(evalAlloc(cand,betas,opts,FCp));
     if(sc>curScore){ curScore=sc; cur=cand; }
     if(it%70===69) step*=0.8;            // cooldown
@@ -2004,7 +2024,7 @@ function runOptimization() {
       var curW     = stocks.map(function(s){return s.value/totalVal;});
       var FCp      = FCmod || FC;
       var objective= document.getElementById('fcOptObjective').value;
-      var scoreOf  = function(st){ return objective==='success' ? (st.successProb||0) : st.median; };
+      var scoreOf  = function(st){ return objective==='success' ? (st.successProb||0) : objective==='p25' ? st.p25 : st.median; };
       var i,a;
 
       var opts = {
@@ -2017,28 +2037,34 @@ function runOptimization() {
         target: fcState.targetValue
       };
 
-      // ── Stage 1: coarse search over structured + random candidates ──
-      // Always seed with current, equal-weight and single-stock corners so
-      // both diversified and concentrated allocations are considered.
-      var bestW = curW.slice();
-      var bestScore = scoreOf(evalAlloc(curW, betas, opts, FCp));
-      function consider(w){ var sc=scoreOf(evalAlloc(w,betas,opts,FCp)); if(sc>bestScore){bestScore=sc;bestW=w.slice();} }
+      // Diversification cap: no single position may exceed effCap. Raise the
+      // cap to 1/n when needed so it stays feasible for small portfolios.
+      var effCap = Math.max(OPT_MAX_WEIGHT, 1/n + 1e-9);
+      var curMax = 0; for(i=0;i<n;i++) if(curW[i]>curMax) curMax=curW[i];
+
+      // ── Stage 1: coarse search over structured + random candidates (all capped) ──
+      // Seed with the capped-current, equal-weight and single-stock corners so
+      // both diversified and (cap-limited) concentrated mixes are considered.
+      var capCur = capWeights(curW, effCap);
+      var bestW = capCur.slice();
+      var bestScore = scoreOf(evalAlloc(capCur, betas, opts, FCp));
+      function consider(w){ w=capWeights(w,effCap); var sc=scoreOf(evalAlloc(w,betas,opts,FCp)); if(sc>bestScore){bestScore=sc;bestW=w.slice();} }
       var eqW=[]; for(i=0;i<n;i++) eqW.push(1/n); consider(eqW);
       for(var c=0;c<n;c++){ var cw=[]; for(i=0;i<n;i++) cw.push(i===c?1:0); consider(cw); }
       for (a=0; a<OPT_N_ALLOC; a++) consider(randomCandidate(n));
 
-      // ── Stage 2: local hill-climb refinement around the best candidate ──
-      bestW = refineAllocation(bestW, betas, opts, FCp, scoreOf).w;
+      // ── Stage 2: local hill-climb refinement (respects the cap) ──
+      bestW = capWeights(refineAllocation(bestW, betas, opts, FCp, scoreOf, effCap).w, effCap);
 
       // ── Stage 3: low-noise final comparison (many more CRN paths) ──
       var optsFine = {}; for(var kk in opts) optsFine[kk]=opts[kk];
       optsFine.nPaths = OPT_N_PATHS_FINE;
-      var curStats = evalAlloc(curW,  betas, optsFine, FCp);
+      var curStats = evalAlloc(curW,  betas, optsFine, FCp);   // current shown as-is (uncapped)
       var optStats = evalAlloc(bestW, betas, optsFine, FCp);
-      // Guard: never present the "optimum" as worse than current on the objective.
-      if(scoreOf(optStats) < scoreOf(curStats)){ bestW=curW.slice(); optStats=curStats; }
+      // If current already respects the cap and still scores higher, keep it.
+      if(curMax <= effCap+1e-6 && scoreOf(optStats) < scoreOf(curStats)){ bestW=curW.slice(); optStats=curStats; }
 
-      renderOptResult(stocks, curW, bestW, curStats, optStats, objective);
+      renderOptResult(stocks, curW, bestW, curStats, optStats, objective, {effCap:effCap, curMax:curMax});
 
     } catch(e) {
       console.error('Optimization error:', e);
@@ -2051,7 +2077,7 @@ function runOptimization() {
   }, 60);
 }
 
-function renderOptResult(stocks, curW, optW, curSt, optSt, objective) {
+function renderOptResult(stocks, curW, optW, curSt, optSt, objective, meta) {
   var medImp = curSt.median>0 ? ((optSt.median-curSt.median)/curSt.median*100).toFixed(1) : '0';
   var spImp  = (curSt.successProb!=null&&optSt.successProb!=null)
     ? Math.round((optSt.successProb-curSt.successProb)*100) : null;
@@ -2066,29 +2092,33 @@ function renderOptResult(stocks, curW, optW, curSt, optSt, objective) {
     h += '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:8px 10px;">'
       +'<div style="font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;">'+lbl+'</div>'
       +'<div style="font-family:Orbitron,monospace;font-size:11px;color:'+col+';">'+fmtAxisY(st.median)+'</div>'
+      +'<div style="font-size:9px;color:var(--text-sec);margin-top:2px;">p25 '+fmtAxisY(st.p25)+'</div>'
       +(st.successProb!=null?'<div style="font-size:9px;color:var(--text-sec);margin-top:2px;">'+Math.round(st.successProb*100)+'% goal</div>':'')
       +'</div>';
   });
   h += '</div>';
 
-  // Improvement badge — finalists use OPT_N_PATHS_FINE paths, so noise is small.
-  var imp = parseFloat(medImp);
-  var spAbs = spImp ? Math.abs(spImp) : 0;
-  var withinNoise = spAbs <= 2 && Math.abs(imp) < 2;
-
-  if (withinNoise) {
-    // Goal already comfortably met — explain the tradeoff
-    var goalPct = Math.round((curSt.successProb||0)*100);
-    h += '<div style="background:rgba(79,195,247,.06);border:1px solid rgba(79,195,247,.2);border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:9px;color:var(--text-sec);line-height:1.5;">'
-      +'<b style="color:var(--accent-cyan);">Result is within simulation noise (±3%)</b><br>'
-      +(goalPct >= 80
-        ? 'Your goal is already being met at '+goalPct+'% probability — both allocations are essentially equivalent for your $'+fmtAxisY(opts&&opts.target||fcState.targetValue)+' target. Try <b>Max Median</b> instead, or raise your goal.'
-        : 'Difference between allocations is smaller than the mini-simulation\'s statistical error. Run with more simulations or try <b>Max Median</b> objective.')
+  // ── Diversification-cap note (shown when current breaches the per-stock cap) ──
+  if (meta && meta.curMax > meta.effCap + 1e-6) {
+    h += '<div style="background:rgba(255,183,77,.06);border:1px solid rgba(255,183,77,.22);border-radius:10px;padding:8px 10px;margin-bottom:10px;font-size:9px;color:var(--accent-warm);line-height:1.5;">'
+      +'\u26A0\uFE0F Your largest position is '+Math.round(meta.curMax*100)+'% of the portfolio. The optimizer enforces a <b>'+Math.round(meta.effCap*100)+'% per-stock diversification cap</b>, so its suggestion trims concentration even if a single high-\u03B2 name would score higher unconstrained.'
       +'</div>';
-  } else if (imp > 0.5 || (spImp && spImp > 2)) {
+  }
+
+  // ── Objective-aware improvement badge (finalists use many CRN paths → low noise) ──
+  var imp = parseFloat(medImp);
+  var objImp, objName;
+  if(objective==='success'){ objImp = (spImp!=null?spImp:0); objName='goal probability'; }
+  else if(objective==='p25'){ objImp = curSt.p25>0 ? ((optSt.p25-curSt.p25)/curSt.p25*100) : 0; objName='downside (p25)'; }
+  else { objImp = imp; objName='median'; }
+  var capBreach = meta && meta.curMax > meta.effCap + 1e-6;
+
+  if (objImp > 1.5 || capBreach) {
     h += '<div style="text-align:center;margin-bottom:10px;">'
       +'<span style="background:rgba(105,240,174,.1);border:1px solid rgba(105,240,174,.25);border-radius:16px;padding:3px 10px;font-size:9px;color:var(--accent-green);font-weight:600;">'
-      +(spImp&&spImp>2?'+'+spImp+'% success · ':'')+'Median '+(imp>=0?'+':'')+medImp+'%</span></div>';
+      +(objImp>=0?'+':'')+objImp.toFixed(objective==='success'?0:1)+(objective==='success'?' pts':'%')+' '+objName+'</span></div>';
+  } else if (objImp < -1.5) {
+    h += '<div style="text-align:center;margin-bottom:10px;font-size:9px;color:var(--text-dim);">Best capped allocation trades '+(-objImp).toFixed(1)+'% '+objName+' for diversification.</div>';
   } else {
     h += '<div style="text-align:center;margin-bottom:10px;font-size:9px;color:var(--text-dim);">Current allocation is near-optimal for this objective.</div>';
   }
@@ -2114,7 +2144,8 @@ function renderOptResult(stocks, curW, optW, curSt, optSt, objective) {
   h += '</tbody></table>';
 
   h += '<div style="margin-top:8px;font-size:8px;color:var(--text-dim);line-height:1.45;">'
-    +'Two-stage search: '+OPT_N_ALLOC.toLocaleString()+' seeded/random allocations (incl. corners &amp; equal-weight) + '+OPT_REFINE_ITERS+'-step hill-climb, finalists re-scored on '+OPT_N_PATHS_FINE.toLocaleString()+' common-random-number paths. '
+    +'Objective: <b>'+(objective==='success'?'Max Goal %':objective==='p25'?'Balanced (Max p25)':'Max Median')+'</b> · '+Math.round((meta?meta.effCap:OPT_MAX_WEIGHT)*100)+'% max per position. '
+    +'Two-stage search: '+OPT_N_ALLOC.toLocaleString()+' seeded/random allocations (corners &amp; equal-weight incl.) + '+OPT_REFINE_ITERS+'-step hill-climb, finalists re-scored on '+OPT_N_PATHS_FINE.toLocaleString()+' common-random-number paths. '
     +'⚠️ Rebalancing may trigger capital gains taxes. Not financial advice.</div>';
 
   document.getElementById('fcOptResults').innerHTML = h;
