@@ -94,6 +94,9 @@
     .pf-total{font-family:'Space Mono',monospace;font-size:clamp(40px,7.5vw,100px);font-weight:700;letter-spacing:-.01em;line-height:1;color:var(--text-primary);text-shadow:0 0 40px rgba(79,195,247,.3);transition:color .5s ease;width:100%;text-align:center;}
     .pf-total.up{color:#a5d6a7;text-shadow:0 0 40px rgba(105,240,174,.3);}
     .pf-total.down{color:#ef9a9a;text-shadow:0 0 40px rgba(239,83,80,.25);}
+    .pf-total.blurred,.pf-change.blurred{filter:blur(16px);opacity:.85;cursor:pointer;-webkit-user-select:none;user-select:none;transition:filter .3s ease;}
+    .portfolio-section{-webkit-tap-highlight-color:transparent;}
+    .pf-reveal-hint{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin-top:4px;opacity:.7;user-select:none;}
     .pf-change{font-size:clamp(13px,1.8vw,20px);font-weight:500;margin-top:4px;letter-spacing:.05em;}
     .pf-change.up{color:var(--accent-green);}.pf-change.down{color:var(--accent-red);}.pf-change.flat{color:var(--text-sec);}
     .pf-meta{display:flex;align-items:center;gap:16px;margin-top:6px;flex-wrap:wrap;justify-content:center;}
@@ -655,6 +658,7 @@ function loadPortfolio(){try{var d=localStorage.getItem(STORAGE_KEY);return d?JS
 function savePortfolio(p){localStorage.setItem(STORAGE_KEY,JSON.stringify(p));}
 
 var portfolio=[];var priceData={};var metricsData={};var ratingsData={};var ratingChanges={};var fngScore=50;
+var pfHidden=true; // privacy: portfolio value starts blurred each launch
 var finnhubKey='';var fetchTimer=null;var REFRESH_MS=5*60*1000;
 var ws=null;var wsRenderTimer=null;var wsReconnectTimer=null;var wsConnected=false;
 
@@ -870,12 +874,15 @@ function renderBubblePanel(){
     if(r)results.push({symbol:p.symbol,wt:wt,r:r});
   });
   if(!results.length){body.innerHTML='<div class="bubble-no-data">Metric data loading\u2026</div>';return;}
-  var scores=results.map(function(x){return x.r.score;});
-  var avgScore=Math.round(scores.reduce(function(a,b){return a+b;},0)/scores.length);
+  // Value-weighted average: weight each stock's bubble score by its portfolio %
+  // so a large overheated position drives portfolio risk more than a tiny one.
+  var wsum=0,wtot=0;
+  results.forEach(function(x){wsum+=x.r.score*x.wt;wtot+=x.wt;});
+  var avgScore=Math.round(wtot>0?wsum/wtot:0);
   // Header portfolio-wide score badge
   var hcls='bubble-score-ok';
   if(avgScore>85)hcls='bubble-score-extreme';else if(avgScore>70)hcls='bubble-score-danger';else if(avgScore>50)hcls='bubble-score-hot';else if(avgScore>25)hcls='bubble-score-warn';
-  if(pscore){pscore.className='bubble-portfolio-score '+hcls;pscore.textContent='Avg '+avgScore;}
+  if(pscore){pscore.className='bubble-portfolio-score '+hcls;pscore.textContent='Wtd '+avgScore;}
   // Sort by score descending
   results.sort(function(a,b){return b.r.score-a.r.score;});
   var html='';
@@ -894,7 +901,7 @@ function renderBubblePanel(){
 }
 
 /* ══════════════════════════════════════════════
-   6. MAIN FETCH CYCLE
+   7. PORTFOLIO CALCULATIONS
    ══════════════════════════════════════════════ */
 function calcTotals(){var val=0,chg=0,has=false;portfolio.forEach(function(p){var pd=priceData[p.symbol];if(pd&&pd.price&&!pd.error){val+=p.shares*pd.price;chg+=p.shares*pd.change;has=true;}});return{value:val,change:chg,hasPrices:has};}
 function calcPortfolioBeta(){
@@ -951,6 +958,34 @@ function updatePortfolioTotal(){
   changeEl.className='pf-change'+(totals.change>0.01?' up':totals.change<-0.01?' down':' flat');
   var prevT=totals.value-totals.change,pct=prevT?totals.change/prevT*100:0;
   changeEl.innerHTML=(totals.change>=0?'&#9650;':'&#9660;')+'&nbsp;'+fmtShort(totals.change)+'&nbsp;&nbsp;('+(pct>=0?'+':'')+pct.toFixed(2)+'%)&nbsp;&nbsp;today';
+  applyPfPrivacy();
+}
+/* ── PRIVACY: blur portfolio value until long-press ── */
+function applyPfPrivacy(){
+  var t=document.getElementById('pfTotal'),c=document.getElementById('pfChange'),l=document.querySelector('.pf-label'),hint=document.getElementById('pfRevealHint');
+  if(t)t.classList.toggle('blurred',pfHidden);
+  if(c)c.classList.toggle('blurred',pfHidden);
+  if(l)l.innerHTML='PORTFOLIO VALUE '+(pfHidden?'\uD83D\uDD12':'\uD83D\uDD13');
+  if(hint)hint.textContent=pfHidden?'\uD83D\uDC46 Hold to reveal':'\uD83D\uDC46 Hold to hide';
+}
+function togglePfPrivacy(){pfHidden=!pfHidden;applyPfPrivacy();}
+function initPrivacyToggle(){
+  var zone=document.querySelector('.portfolio-section');if(!zone)return;
+  // Inject reveal hint under the value block if not present
+  if(!document.getElementById('pfRevealHint')){
+    var hint=document.createElement('div');hint.className='pf-reveal-hint';hint.id='pfRevealHint';
+    var distrib=document.getElementById('pfDistrib');
+    if(distrib&&distrib.parentNode)distrib.parentNode.insertBefore(hint,distrib);else zone.appendChild(hint);
+  }
+  var timer=null;
+  function start(e){clearTimeout(timer);timer=setTimeout(togglePfPrivacy,450);}
+  function cancel(){clearTimeout(timer);}
+  zone.addEventListener('pointerdown',start);
+  zone.addEventListener('pointerup',cancel);
+  zone.addEventListener('pointerleave',cancel);
+  zone.addEventListener('pointercancel',cancel);
+  zone.addEventListener('contextmenu',function(e){e.preventDefault();}); // suppress long-press menu on mobile
+  applyPfPrivacy();
 }
 function renderPfMeta(){
   var betaVal=calcPortfolioBeta(),betaEl=document.getElementById('pfBeta');
@@ -2041,6 +2076,9 @@ else{ showSetup(false); addStockRow('AAPL',''); addStockRow('TSLA',''); }
 
 // Forecast UI init (after DOM ready)
 initForecastUI();
+
+// Privacy: blur portfolio value until long-press
+initPrivacyToggle();
 
 // PWA Service Worker
 if('serviceWorker' in navigator){
