@@ -59,7 +59,7 @@
     .btn-save:hover{box-shadow:0 0 20px rgba(0,229,255,.25);}
 
     /* ── MAIN DASHBOARD ── */
-    .dashboard{position:relative;z-index:2;width:100vw;height:100vh;display:grid;grid-template-rows:auto auto auto auto 1fr auto;padding:18px 40px 12px;gap:0;}
+    .dashboard{position:relative;z-index:2;width:100vw;height:100vh;display:grid;grid-template-rows:auto auto auto auto auto 1fr auto;padding:18px 40px 12px;gap:0;}
     .top-strip{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.07);}
     .top-time-wrap{display:flex;align-items:baseline;gap:3px;}
     .top-time{font-family:'Orbitron',monospace;font-size:clamp(58px,8.5vw,115px);font-weight:900;letter-spacing:.04em;line-height:1;background:linear-gradient(135deg,#e8f4fd,var(--accent-cyan) 50%,var(--accent-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-variant-numeric:tabular-nums;}
@@ -142,6 +142,37 @@
     .bubble-suggestion{font-size:9px;color:var(--accent-warm);letter-spacing:.04em;flex:1;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .bubble-no-data{font-size:10px;color:var(--text-dim);text-align:center;padding:8px 0;letter-spacing:.1em;}
     .bubble-bond-alert{font-size:9px;color:#b39ddb;padding:4px 16px 6px;letter-spacing:.06em;text-align:center;border-top:1px solid rgba(255,255,255,.04);}
+    /* ── ANALYST PRICE TARGETS ── */
+    .pt-panel{background:var(--bg-card);border:1px solid rgba(255,255,255,.06);border-radius:14px;margin-bottom:8px;overflow:hidden;backdrop-filter:blur(10px);}
+    .pt-header{display:flex;align-items:center;justify-content:space-between;padding:7px 16px;cursor:pointer;user-select:none;border-bottom:1px solid rgba(255,255,255,.05);}
+    .pt-header-left{display:flex;align-items:center;gap:8px;}
+    .pt-title{font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--text-dim);}
+    .pt-title-sym{font-family:'Orbitron',monospace;font-size:11px;font-weight:700;color:var(--accent-cyan);letter-spacing:.06em;}
+    .pt-toggle{font-size:9px;color:var(--text-dim);transition:transform .25s;display:inline-block;}
+    .pt-toggle.open{transform:rotate(180deg);}
+    .pt-body{padding:8px 16px 10px;}
+    .pt-agg{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;justify-content:center;}
+    .pt-chip{display:flex;flex-direction:column;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:4px 10px;min-width:56px;}
+    .pt-k{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);}
+    .pt-v{font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:var(--text-primary);}
+    .pt-v.pt-mean{color:var(--accent-cyan);}
+    .pt-up{color:var(--accent-green);}.pt-down{color:var(--accent-red);}
+    .pt-bar-wrap{position:relative;height:10px;margin:8px 4px 2px;}
+    .pt-bar-track{position:absolute;left:0;right:0;top:4px;height:3px;border-radius:2px;background:linear-gradient(90deg,var(--accent-red),#fff176,var(--accent-green));opacity:.5;}
+    .pt-bar-mean{position:absolute;top:-1px;width:2px;height:11px;background:var(--accent-cyan);}
+    .pt-bar-cur{position:absolute;top:-2px;width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid var(--accent-blue);transform:translateX(-5px);box-shadow:0 0 6px rgba(79,195,247,.6);}
+    .pt-bar-labels{display:flex;justify-content:space-between;font-size:8px;color:var(--text-dim);margin-top:3px;letter-spacing:.04em;}
+    .pt-firms-hdr{font-size:8px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim);margin:8px 0 2px;border-top:1px solid rgba(255,255,255,.05);padding-top:8px;}
+    .pt-firm-row{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:10px;}
+    .pt-firm{color:var(--text-primary);font-weight:600;min-width:108px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .pt-firm-act{font-size:9px;font-weight:600;padding:1px 6px;border-radius:8px;white-space:nowrap;text-transform:capitalize;}
+    .pt-act-up{color:var(--accent-green);background:rgba(105,240,174,.1);border:1px solid rgba(105,240,174,.25);}
+    .pt-act-down{color:var(--accent-red);background:rgba(239,83,80,.1);border:1px solid rgba(239,83,80,.25);}
+    .pt-act-maintain{color:var(--text-sec);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);}
+    .pt-act-init{color:var(--accent-blue);background:rgba(79,195,247,.1);border:1px solid rgba(79,195,247,.25);}
+    .pt-firm-grade{color:var(--text-sec);font-size:9px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .pt-firm-date{color:var(--text-dim);font-size:9px;white-space:nowrap;}
+    .pt-no-data{font-size:10px;color:var(--text-dim);text-align:center;padding:6px 0;letter-spacing:.06em;}
     .stock-table-wrap{overflow-y:auto;overflow-x:hidden;background:var(--bg-card);border:1px solid rgba(255,255,255,.06);border-radius:18px;backdrop-filter:blur(10px);}
     .stock-table{width:100%;border-collapse:collapse;}
     .stock-table thead tr{background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.07);}
@@ -313,7 +344,7 @@
       /* ── Dashboard mobile fixes ── */
       .dashboard{
         height:100dvh;overflow:hidden;
-        grid-template-rows:auto auto auto 1fr auto;
+        grid-template-rows:auto auto auto auto 1fr auto;
         padding:6px 12px 6px;gap:4px;
       }
       .top-strip{display:none;}
@@ -466,6 +497,16 @@
       <span class="bubble-toggle" id="bubbleToggle">&#9650;</span>
     </div>
     <div class="bubble-body" id="bubbleBody" style="display:none;"></div>
+  </div>
+  <div class="pt-panel" id="ptPanel">
+    <div class="pt-header" onclick="togglePtPanel()">
+      <div class="pt-header-left">
+        <span class="pt-title">&#127919; Price Targets</span>
+        <span class="pt-title-sym" id="ptTitleSym"></span>
+      </div>
+      <span class="pt-toggle" id="ptToggle">&#9650;</span>
+    </div>
+    <div class="pt-body" id="ptBody" style="display:none;"></div>
   </div>
   <div class="stock-table-wrap">
     <table class="stock-table">
@@ -811,7 +852,7 @@ function fetchStockPrices(){
     fetchOneSafe(p.symbol).then(function(r){
       priceData[r.symbol]=r;if(!r.error)anySuccess=true;pending--;
       renderTable();updatePortfolioTotal();
-      if(pending===0){Promise.all(metricPromises).then(function(){renderTable();renderPfMeta();renderConsensus();renderBubblePanel();});
+      if(pending===0){Promise.all(metricPromises).then(function(){renderTable();renderPfMeta();renderConsensus();renderBubblePanel();renderPriceTargetPanel();});
         var now=new Date(),hh=now.getHours(),mm=now.getMinutes();
         document.getElementById('lastUpdate').textContent=anySuccess?(hh<10?'0'+hh:hh)+':'+(mm<10?'0'+mm:mm):'Failed — add Finnhub key or retry';
       }
@@ -852,6 +893,135 @@ function computeBubbleScore(symbol,weightPct){
   if(rawPct>0.90&&fngScore>70){suggestion='Near peak + greed: trim 10\u201320%';}
   if(beta>1.5&&fngScore>75&&weightPct>10){suggestion='High-\u03B2 in greed: hedge';}
   return{score:total,label:label,cls:cls,barCls:barCls,suggestion:suggestion};
+}
+/* ── ANALYST PRICE TARGETS (top holding) ── */
+var ptSymbol='',ptTarget=null,ptFirms=null,ptLoading=false;
+var avKey=localStorage.getItem('stockDash_av_v1')||'';
+function saveAvKey(v){avKey=(v||'').trim();if(avKey){localStorage.setItem('stockDash_av_v1',avKey);}ptSymbol='';renderPriceTargetPanel();}
+function togglePtPanel(){
+  var b=document.getElementById('ptBody'),t=document.getElementById('ptToggle');if(!b||!t)return;
+  var open=b.style.display!=='none';b.style.display=open?'none':'';t.className=open?'pt-toggle':'pt-toggle open';
+}
+function pickTopHolding(){
+  var best=null,bestVal=0;
+  portfolio.forEach(function(p){var pd=priceData[p.symbol];if(pd&&pd.price&&!pd.error){var v=p.shares*pd.price;if(v>bestVal){bestVal=v;best=p.symbol;}}});
+  return best;
+}
+/* Yahoo Finance quoteSummary — free, no API key. Provides analyst price
+   targets (financialData) and per-firm upgrade/downgrade actions with firm
+   names (upgradeDowngradeHistory). Fetched through CORS proxies. */
+function fetchYahooSummary(sym){
+  var url='https://query1.finance.yahoo.com/v10/finance/quoteSummary/'+encodeURIComponent(sym)+'?modules=financialData,upgradeDowngradeHistory';
+  var parse=function(d){var res=d&&d.quoteSummary&&d.quoteSummary.result&&d.quoteSummary.result[0];if(!res)throw new Error('no summary');return res;};
+  var p1=fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url)).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(parse);
+  var p2=fetch('https://corsproxy.io/?'+url).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(parse);
+  return raceFirstSuccess([p1,p2]);
+}
+/* Yahoo path (best-effort; Yahoo now often blocks anonymous quoteSummary). */
+function fetchYahooPT(sym){
+  var ACT={up:'Upgrade',down:'Downgrade',init:'Initiate',main:'Maintain',reit:'Reiterate'};
+  return fetchYahooSummary(sym).then(function(res){
+    var fd=res.financialData||{};
+    function num(x){return (x&&typeof x==='object')?(x.raw!=null?x.raw:0):(x||0);}
+    var mean=num(fd.targetMeanPrice),hi=num(fd.targetHighPrice),lo=num(fd.targetLowPrice),med=num(fd.targetMedianPrice),nA=num(fd.numberOfAnalystOpinions);
+    if(!(mean||hi||med))throw new Error('no yahoo targets');
+    ptTarget={targetMean:mean,targetHigh:hi,targetLow:lo,targetMedian:med,numAnalysts:nA,src:'Yahoo'};
+    var hist=res.upgradeDowngradeHistory&&res.upgradeDowngradeHistory.history;
+    ptFirms=(hist&&hist.length)?hist.slice(0,8).map(function(f){return {company:f.firm,action:ACT[f.action]||f.action||'',fromGrade:f.fromGrade,toGrade:f.toGrade,gradeTime:f.epochGradeDate};}):null;
+  });
+}
+/* Alpha Vantage OVERVIEW — free key, sends CORS headers (direct fetch, no
+   proxy). Gives the analyst mean target price + rating-count breakdown. */
+function fetchAlphaTarget(sym){
+  return fetch('https://www.alphavantage.co/query?function=OVERVIEW&symbol='+encodeURIComponent(sym)+'&apikey='+encodeURIComponent(avKey)).then(function(r){return r.json();}).then(function(d){
+    if(!d||d.Note||d.Information||d['Error Message']||!d.AnalystTargetPrice)throw new Error('no av data');
+    var mean=parseFloat(d.AnalystTargetPrice)||0;
+    if(!mean)throw new Error('no av target');
+    var rc={sb:+d.AnalystRatingStrongBuy||0,b:+d.AnalystRatingBuy||0,h:+d.AnalystRatingHold||0,s:+d.AnalystRatingSell||0,ss:+d.AnalystRatingStrongSell||0};
+    var tot=rc.sb+rc.b+rc.h+rc.s+rc.ss;
+    ptTarget={targetMean:mean,targetHigh:0,targetLow:0,targetMedian:0,numAnalysts:tot,ratings:rc,src:'Alpha Vantage'};
+    ptFirms=null;
+  });
+}
+function fetchPriceTargetData(sym){
+  ptTarget=null;ptFirms=null;
+  var chain=avKey?fetchAlphaTarget(sym).catch(function(){return fetchYahooPT(sym);}):fetchYahooPT(sym);
+  return chain.catch(function(){ptTarget=null;ptFirms=null;});
+}
+function renderPriceTargetPanel(){
+  var body=document.getElementById('ptBody'),ttl=document.getElementById('ptTitleSym');
+  if(!body)return;
+  var sym=pickTopHolding();
+  if(!sym){body.innerHTML='<div class="pt-no-data">No holdings priced yet.</div>';if(ttl)ttl.textContent='';return;}
+  if(ttl)ttl.textContent=sym;
+  if(sym!==ptSymbol){
+    ptSymbol=sym;ptTarget=null;ptFirms=null;ptLoading=true;
+    body.innerHTML='<div class="pt-no-data"><span class="spinner"></span>Loading analyst targets\u2026</div>';
+    fetchPriceTargetData(sym).then(function(){ptLoading=false;if(pickTopHolding()===ptSymbol)paintPt(sym);});
+    return;
+  }
+  if(ptLoading){body.innerHTML='<div class="pt-no-data"><span class="spinner"></span>Loading analyst targets\u2026</div>';return;}
+  paintPt(sym);
+}
+function paintPt(sym){
+  var body=document.getElementById('ptBody');if(!body)return;
+  var pd=priceData[sym],cur=pd&&pd.price?pd.price:0,html='';
+  if(ptTarget){
+    var lo=ptTarget.targetLow||0,hi=ptTarget.targetHigh||0,mean=ptTarget.targetMean||0,med=ptTarget.targetMedian||0;
+    var up=(mean&&cur)?((mean-cur)/cur*100):null;
+    html+='<div class="pt-agg">'
+      +'<div class="pt-chip"><span class="pt-k">Now</span><span class="pt-v">'+(cur?fmtPrice(cur):'--')+'</span></div>'
+      +'<div class="pt-chip"><span class="pt-k">Low</span><span class="pt-v">'+(lo?fmtPrice(lo):'--')+'</span></div>'
+      +'<div class="pt-chip"><span class="pt-k">Mean</span><span class="pt-v pt-mean">'+(mean?fmtPrice(mean):'--')+'</span></div>'
+      +'<div class="pt-chip"><span class="pt-k">Median</span><span class="pt-v">'+(med?fmtPrice(med):'--')+'</span></div>'
+      +'<div class="pt-chip"><span class="pt-k">High</span><span class="pt-v">'+(hi?fmtPrice(hi):'--')+'</span></div>'
+      +(up!==null?'<div class="pt-chip"><span class="pt-k">Upside</span><span class="pt-v '+(up>=0?'pt-up':'pt-down')+'">'+(up>=0?'+':'')+up.toFixed(1)+'%</span></div>':'')
+      +'</div>';
+    if(hi>lo){
+      var span=hi-lo,curPos=Math.min(Math.max((cur-lo)/span,0),1)*100,meanPos=Math.min(Math.max((mean-lo)/span,0),1)*100;
+      html+='<div class="pt-bar-wrap"><div class="pt-bar-track"></div>'
+        +'<div class="pt-bar-mean" style="left:'+meanPos+'%" title="Mean target"></div>'
+        +'<div class="pt-bar-cur" style="left:'+curPos+'%" title="Current price"></div></div>'
+        +'<div class="pt-bar-labels"><span>'+fmtPrice(lo)+'</span><span>mean '+fmtPrice(mean)+(ptTarget.numAnalysts?' \u00b7 '+ptTarget.numAnalysts+' analysts':'')+'</span><span>'+fmtPrice(hi)+'</span></div>';
+    }
+  } else {
+    html+='<div class="pt-no-data">Aggregate price target unavailable for this symbol.</div>';
+  }
+  if(ptTarget&&ptTarget.ratings){
+    var rc=ptTarget.ratings,tt=ptTarget.numAnalysts||0;
+    html+='<div class="pt-firms-hdr">Analyst ratings ('+tt+')</div>';
+    var ptBar=function(lbl,nn,cls){var pct=tt?Math.round(nn/tt*100):0;return '<div class="pt-firm-row"><span class="pt-firm" style="min-width:72px">'+lbl+'</span><div class="bubble-bar-wrap"><div class="bubble-bar '+cls+'" style="width:'+pct+'%"></div></div><span class="pt-firm-date">'+nn+'</span></div>';};
+    html+=ptBar('Strong Buy',rc.sb,'bubble-bar-ok')+ptBar('Buy',rc.b,'bubble-bar-ok')+ptBar('Hold',rc.h,'bubble-bar-warn')+ptBar('Sell',rc.s,'bubble-bar-hot')+ptBar('Strong Sell',rc.ss,'bubble-bar-danger');
+  }
+  if(ptFirms&&ptFirms.length){
+    html+='<div class="pt-firms-hdr">Recent analyst actions</div>';
+    ptFirms.slice(0,7).forEach(function(f){
+      var comp=f.company||f.gradeCompany||'Analyst',act=(f.action||'').toLowerCase();
+      var acls='pt-act-maintain',aemoji='\u2192';
+      if(act.indexOf('up')>=0){acls='pt-act-up';aemoji='\u2191';}
+      else if(act.indexOf('down')>=0){acls='pt-act-down';aemoji='\u2193';}
+      else if(act.indexOf('init')>=0){acls='pt-act-init';aemoji='\u2726';}
+      var ts=f.gradeTime||f.time||0,dt=ts?new Date(ts*1000):null;
+      var dstr=dt?((dt.getMonth()+1)+'/'+dt.getDate()+'/'+String(dt.getFullYear()).slice(2)):'';
+      var grade=(f.fromGrade&&f.toGrade)?(f.fromGrade+' \u2192 '+f.toGrade):(f.toGrade||'');
+      html+='<div class="pt-firm-row">'
+        +'<span class="pt-firm">'+comp+'</span>'
+        +'<span class="pt-firm-act '+acls+'">'+aemoji+' '+(f.action||'')+'</span>'
+        +'<span class="pt-firm-grade">'+grade+'</span>'
+        +'<span class="pt-firm-date">'+dstr+'</span></div>';
+    });
+  } else if(ptTarget){
+    html+='<div class="pt-no-data" style="padding-top:6px;">No recent per-firm rating changes.</div>';
+  }
+  if(!ptTarget&&!(ptFirms&&ptFirms.length)){
+    html='<div class="pt-no-data">Live analyst targets need a free <b>Alpha Vantage</b> key (Yahoo blocks anonymous access). <a href="https://www.alphavantage.co/support/#api-key" target="_blank" style="color:var(--accent-blue);text-decoration:none;">Get a free key &#8599;</a></div>'
+      +'<div style="display:flex;gap:6px;justify-content:center;margin-top:6px;">'
+      +'<input id="avKeyInp" placeholder="Paste Alpha Vantage key" value="'+(avKey||'')+'" style="flex:0 1 200px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text-primary);font-size:11px;padding:5px 8px;outline:none;" />'
+      +'<button onclick="saveAvKey(document.getElementById(\'avKeyInp\').value)" style="background:rgba(0,229,255,.12);border:1px solid rgba(0,229,255,.3);border-radius:8px;color:var(--accent-cyan);font-size:11px;padding:5px 12px;cursor:pointer;">Save</button></div>';
+  } else if(ptTarget&&ptTarget.src){
+    html+='<div class="pt-no-data" style="padding-top:6px;">Source: '+ptTarget.src+'</div>';
+  }
+  body.innerHTML=html;
 }
 function toggleBubblePanel(){
   var body=document.getElementById('bubbleBody'),tog=document.getElementById('bubbleToggle');

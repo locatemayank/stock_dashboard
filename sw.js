@@ -1,6 +1,14 @@
 'use strict';
-const CACHE = 'portfolio-predictor-v1';
-const PRECACHE = ['./', './index.html', './data/market_history.js'];
+const CACHE = 'portfolio-predictor-v2';
+const PRECACHE = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icon.svg',
+  './icon-192.png',
+  './icon-512.png',
+  './data/market_history.js'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(
