@@ -173,6 +173,38 @@
     .pt-firm-grade{color:var(--text-sec);font-size:9px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .pt-firm-date{color:var(--text-dim);font-size:9px;white-space:nowrap;}
     .pt-no-data{font-size:10px;color:var(--text-dim);text-align:center;padding:6px 0;letter-spacing:.06em;}
+    /* ── STOCK DETAIL MODAL ── */
+    .sd-overlay{position:fixed;inset:0;z-index:400;background:rgba(2,3,12,.85);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px;}
+    .sd-overlay.open{display:flex;}
+    .sd-card{background:rgba(12,18,40,.97);border:1px solid rgba(79,195,247,.2);border-radius:18px;width:min(560px,94vw);max-height:88vh;overflow-y:auto;box-shadow:0 8px 60px rgba(0,0,0,.6);}
+    .sd-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid rgba(255,255,255,.07);position:sticky;top:0;background:rgba(12,18,40,.98);z-index:1;}
+    .sd-title{font-family:'Orbitron',monospace;font-size:18px;font-weight:700;color:var(--accent-cyan);letter-spacing:.06em;}
+    .sd-sub{font-size:10px;color:var(--text-dim);margin-top:2px;}
+    .sd-close{background:rgba(239,83,80,.1);border:1px solid rgba(239,83,80,.2);border-radius:10px;color:var(--accent-red);font-size:16px;width:34px;height:34px;cursor:pointer;flex-shrink:0;}
+    .sd-body{padding:14px 18px 18px;}
+    .sd-sec{margin-bottom:16px;}
+    .sd-sec-h{font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--accent-cyan);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+    .sd-sec-h::after{content:'';flex:1;height:1px;background:rgba(0,229,255,.15);}
+    .sd-stat-grid{display:flex;flex-wrap:wrap;gap:8px;}
+    .sd-stat{flex:1 0 90px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px 10px;}
+    .sd-stat .k{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);}
+    .sd-stat .v{font-family:'Orbitron',monospace;font-size:14px;font-weight:700;color:var(--text-primary);margin-top:2px;}
+    .sd-news-item{display:block;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;}
+    .sd-news-item:last-child{border-bottom:none;}
+    .sd-news-t{font-size:11px;color:var(--text-primary);line-height:1.4;}
+    .sd-news-m{display:flex;gap:8px;align-items:center;margin-top:3px;font-size:9px;color:var(--text-dim);}
+    .sd-sent{font-weight:700;padding:1px 6px;border-radius:8px;}
+    .sd-sent-pos{color:var(--accent-green);background:rgba(105,240,174,.1);}
+    .sd-sent-neu{color:var(--text-sec);background:rgba(255,255,255,.05);}
+    .sd-sent-neg{color:var(--accent-red);background:rgba(239,83,80,.1);}
+    .sd-ins-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:10px;}
+    .sd-ins-row:last-child{border-bottom:none;}
+    .sd-ins-name{flex:1;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .sd-ins-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;}
+    .sd-ins-buy{color:var(--accent-green);background:rgba(105,240,174,.1);}
+    .sd-ins-sell{color:var(--accent-red);background:rgba(239,83,80,.1);}
+    .sd-nd{font-size:10px;color:var(--text-dim);text-align:center;padding:8px 0;letter-spacing:.04em;}
+    .stock-table tbody tr{cursor:pointer;}
     .stock-table-wrap{overflow-y:auto;overflow-x:hidden;background:var(--bg-card);border:1px solid rgba(255,255,255,.06);border-radius:18px;backdrop-filter:blur(10px);}
     .stock-table{width:100%;border-collapse:collapse;}
     .stock-table thead tr{background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.07);}
@@ -526,6 +558,17 @@
       <button class="btn-edit" id="btnEdit">&#9881; Edit</button>
       <button class="btn-forecast" id="btnForecast">&#128200; Forecast</button>
     </div>
+  </div>
+</div>
+
+<!-- STOCK DETAIL MODAL -->
+<div class="sd-overlay" id="sdOverlay" onclick="if(event.target===this)closeStockDetail()">
+  <div class="sd-card">
+    <div class="sd-head">
+      <div><div class="sd-title" id="sdTitle">&mdash;</div><div class="sd-sub" id="sdSub"></div></div>
+      <button class="sd-close" onclick="closeStockDetail()">&#10005;</button>
+    </div>
+    <div class="sd-body" id="sdBody"></div>
   </div>
 </div>
 
@@ -1023,6 +1066,83 @@ function paintPt(sym){
   }
   body.innerHTML=html;
 }
+/* ── STOCK DETAIL MODAL: News sentiment (5), Insider tx (6), Analytics (9) ──
+   All from Alpha Vantage (needs avKey). Fetched on click, cached per symbol.
+   Uses ~3 AV calls per stock (mind the free 25/day limit). */
+var sdCache={};
+function closeStockDetail(){var o=document.getElementById('sdOverlay');if(o)o.classList.remove('open');}
+function openStockDetail(sym){
+  var ov=document.getElementById('sdOverlay');if(!ov)return;ov.classList.add('open');
+  document.getElementById('sdTitle').textContent=sym;
+  var pd=priceData[sym];
+  document.getElementById('sdSub').textContent=(pd&&pd.name&&pd.name!==sym?pd.name+' \u00b7 ':'')+(pd&&pd.price?fmtPrice(pd.price):'');
+  var body=document.getElementById('sdBody');
+  if(!avKey){body.innerHTML='<div class="sd-nd">Add a free <b>Alpha Vantage</b> key in the \uD83C\uDFAF Price Targets panel to load news, insider activity &amp; analytics.</div>';return;}
+  if(sdCache[sym]){paintStockDetail(sym);return;}
+  body.innerHTML='<div class="sd-nd"><span class="spinner"></span>Loading insights (uses ~3 Alpha Vantage calls)\u2026</div>';
+  var base='https://www.alphavantage.co/query?apikey='+encodeURIComponent(avKey);
+  var pNews=fetch(base+'&function=NEWS_SENTIMENT&limit=10&tickers='+encodeURIComponent(sym)).then(function(r){return r.json();}).catch(function(){return null;});
+  var pIns =fetch(base+'&function=INSIDER_TRANSACTIONS&symbol='+encodeURIComponent(sym)).then(function(r){return r.json();}).catch(function(){return null;});
+  var pAna =fetch('https://alphavantageapi.co/timeseries/analytics?SYMBOLS='+encodeURIComponent(sym)+'&RANGE=6month&INTERVAL=DAILY&OHLC=close&CALCULATIONS=MEAN,STDDEV,MAX_DRAWDOWN,CUMULATIVE_RETURN,VARIANCE&apikey='+encodeURIComponent(avKey)).then(function(r){return r.json();}).catch(function(){return null;});
+  Promise.all([pNews,pIns,pAna]).then(function(res){
+    sdCache[sym]={news:res[0],insider:res[1],analytics:res[2]};
+    if(document.getElementById('sdOverlay').classList.contains('open')&&document.getElementById('sdTitle').textContent===sym) paintStockDetail(sym);
+  });
+}
+function paintStockDetail(sym){
+  var body=document.getElementById('sdBody');if(!body)return;
+  var c=sdCache[sym]||{},h='';
+  /* Analytics (9) */
+  h+='<div class="sd-sec"><div class="sd-sec-h">\uD83D\uDCC8 Analytics \u00b7 6-month daily</div>';
+  var rc=c.analytics&&c.analytics.payload&&c.analytics.payload.RETURNS_CALCULATIONS;
+  if(rc){
+    var g=function(k){var o=rc[k];if(!o)return null;var v=o[sym];return (v==null)?null:v;};
+    var mean=g('MEAN'),sd=g('STDDEV'),dd=g('MAX_DRAWDOWN'),cr=g('CUMULATIVE_RETURN');
+    var annRet=mean!=null?(mean*252*100):null,annVol=sd!=null?(sd*Math.sqrt(252)*100):null;
+    var rv=(annRet!=null&&annVol)?(annRet/annVol):null;
+    var st='';
+    if(cr!=null)st+='<div class="sd-stat"><div class="k">6M Return</div><div class="v" style="color:'+(cr>=0?'var(--accent-green)':'var(--accent-red)')+'">'+(cr>=0?'+':'')+(cr*100).toFixed(1)+'%</div></div>';
+    if(annRet!=null)st+='<div class="sd-stat"><div class="k">Ann. Return</div><div class="v">'+(annRet>=0?'+':'')+annRet.toFixed(1)+'%</div></div>';
+    if(annVol!=null)st+='<div class="sd-stat"><div class="k">Ann. Volatility</div><div class="v">'+annVol.toFixed(1)+'%</div></div>';
+    if(rv!=null)st+='<div class="sd-stat"><div class="k">Return / Vol</div><div class="v">'+rv.toFixed(2)+'</div></div>';
+    if(dd!=null)st+='<div class="sd-stat"><div class="k">Max Drawdown</div><div class="v" style="color:var(--accent-red)">'+(dd*100).toFixed(1)+'%</div></div>';
+    h+=st?('<div class="sd-stat-grid">'+st+'</div>'):'<div class="sd-nd">No analytics values returned.</div>';
+  } else { h+='<div class="sd-nd">Analytics unavailable (rate-limited or unsupported symbol).</div>'; }
+  h+='</div>';
+  /* News sentiment (5) */
+  h+='<div class="sd-sec"><div class="sd-sec-h">\uD83D\uDCF0 News Sentiment</div>';
+  var feed=c.news&&c.news.feed;
+  if(feed&&feed.length){
+    feed.slice(0,6).forEach(function(a){
+      var ts=null;if(a.ticker_sentiment)a.ticker_sentiment.forEach(function(t){if(t.ticker===sym)ts=t;});
+      var lab=ts?ts.ticker_sentiment_label:(a.overall_sentiment_label||'Neutral');
+      var sc=ts?parseFloat(ts.ticker_sentiment_score):parseFloat(a.overall_sentiment_score||0);
+      var scls=sc>0.15?'sd-sent-pos':(sc<-0.15?'sd-sent-neg':'sd-sent-neu');
+      var tp=a.time_published||'',d=tp.length>=8?(tp.slice(4,6)+'/'+tp.slice(6,8)):'';
+      h+='<a class="sd-news-item" href="'+(a.url||'#')+'" target="_blank" rel="noopener">'
+        +'<div class="sd-news-t">'+(a.title||'')+'</div>'
+        +'<div class="sd-news-m"><span class="sd-sent '+scls+'">'+lab+'</span><span>'+(a.source||'')+'</span><span>'+d+'</span></div></a>';
+    });
+  } else { h+='<div class="sd-nd">No recent news (or rate-limited).</div>'; }
+  h+='</div>';
+  /* Insider transactions (6) */
+  h+='<div class="sd-sec"><div class="sd-sec-h">\uD83D\uDC64 Insider Transactions</div>';
+  var idat=c.insider&&c.insider.data;
+  if(idat&&idat.length){
+    idat.slice(0,8).forEach(function(t){
+      var acq=(t.acquisition_or_disposal||'').toUpperCase()==='A';
+      var sh=parseFloat(t.shares)||0,pr=parseFloat(t.share_price)||0;
+      h+='<div class="sd-ins-row">'
+        +'<span class="sd-ins-name">'+(t.executive||'')+(t.executive_title?' \u00b7 '+t.executive_title:'')+'</span>'
+        +'<span class="sd-ins-badge '+(acq?'sd-ins-buy':'sd-ins-sell')+'">'+(acq?'BUY':'SELL')+'</span>'
+        +'<span style="color:var(--text-sec);white-space:nowrap;">'+(sh?Math.round(sh).toLocaleString():'')+(pr?' @ '+fmtPrice(pr):'')+'</span>'
+        +'<span style="color:var(--text-dim);white-space:nowrap;">'+(t.transaction_date||'')+'</span></div>';
+    });
+  } else { h+='<div class="sd-nd">No recent insider transactions (or rate-limited).</div>'; }
+  h+='</div>';
+  h+='<div class="sd-nd" style="text-align:left;">Source: Alpha Vantage \u00b7 cached for this session \u00b7 not financial advice.</div>';
+  body.innerHTML=h;
+}
 function toggleBubblePanel(){
   var body=document.getElementById('bubbleBody'),tog=document.getElementById('bubbleToggle');
   if(!body||!tog)return;
@@ -1113,7 +1233,7 @@ function renderTable(){
     else{var v=p.shares*pd.price,chg=p.shares*pd.change;priceStr=fmtPrice(pd.price);valueStr=fmtDollar(v);var sign=chg>=0?'&#9650;':'&#9660;';var pctStr=(pd.changePct>=0?'+':'')+pd.changePct.toFixed(2)+'%';changeStr='<span class="chg-full">'+sign+'&nbsp;'+fmtShort(chg)+'&nbsp;('+pctStr+')</span><span class="chg-short">'+sign+'&nbsp;'+pctStr+'</span>';changeCls=chg>0.001?'up':(chg<-0.001?'down':'flat');nameStr=pd.name;}
     var rat=ratingsData[p.symbol],chgRat=ratingChanges[p.symbol];
     var ratHtml=rat?'<div class="rat-badge '+rat.cls+'">'+rat.label+(chgRat?'<span style="font-size:8px;display:block;color:'+(chgRat.dir==='up'?'var(--accent-green)':'var(--accent-red)')+';">'+(chgRat.dir==='up'?'\u2191':'\u2193')+' was '+chgRat.fromLabel+'</span>':'')+'</div>':'';
-    html+='<tr><td><div class="td-symbol">'+p.symbol+'</div><div class="td-name">'+nameStr+'</div>'+(pd&&pd.price&&!pd.error?render52wBar(p.symbol,pd.price):'')+ratHtml+'</td><td class="td-shares">'+p.shares.toLocaleString()+'</td><td class="td-price">'+priceStr+'</td><td class="td-value">'+valueStr+'</td><td class="td-change '+changeCls+'">'+changeStr+'</td></tr>';
+    html+='<tr onclick="openStockDetail(\''+p.symbol+'\')"><td><div class="td-symbol">'+p.symbol+'</div><div class="td-name">'+nameStr+'</div>'+(pd&&pd.price&&!pd.error?render52wBar(p.symbol,pd.price):'')+ratHtml+'</td><td class="td-shares">'+p.shares.toLocaleString()+'</td><td class="td-price">'+priceStr+'</td><td class="td-value">'+valueStr+'</td><td class="td-change '+changeCls+'">'+changeStr+'</td></tr>';
   });
   tbody.innerHTML=html||'<tr><td colspan="5" class="stock-empty">No stocks.</td></tr>';
 }
