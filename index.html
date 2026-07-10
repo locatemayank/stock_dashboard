@@ -796,9 +796,15 @@ function raceFirstSuccess(promises){return new Promise(function(resolve,reject){
 function fetchYahooSingle(symbol){
   var chartUrl='https://query1.finance.yahoo.com/v8/finance/chart/'+symbol+'?range=1d&interval=1d';
   var parse=function(d){return parseYahooChart(symbol,d);};
-  var p1=fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(chartUrl)).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(parse);
-  var p2=fetch('https://corsproxy.io/?'+chartUrl).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(parse);
-  return raceFirstSuccess([p1,p2]);
+  var mk=function(u){return fetch(u).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}).then(parse);};
+  // Race several proxies + a direct attempt; first success wins → fastest + most reliable.
+  return raceFirstSuccess([
+    mk('https://api.allorigins.win/raw?url='+encodeURIComponent(chartUrl)),
+    mk('https://corsproxy.io/?url='+encodeURIComponent(chartUrl)),
+    mk('https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(chartUrl)),
+    mk('https://thingproxy.freeboard.io/fetch/'+chartUrl),
+    mk(chartUrl)
+  ]);
 }
 function fetchFinnhubSingle(symbol){
   var url='https://finnhub.io/api/v1/quote?symbol='+encodeURIComponent(symbol)+'&token='+encodeURIComponent(finnhubKey);
@@ -889,15 +895,26 @@ function fetchFinnhubMetrics(symbol){
    ══════════════════════════════════════════════ */
 function fetchStockPrices(){
   if(!portfolio.length)return;
-  var metricPromises=portfolio.map(function(p){return fetchFinnhubMetrics(p.symbol);});
+  // ── PRIORITY 1: stock prices only. Fire these first with no competing
+  //    requests so the browser dedicates connections to them. ──
   var pending=portfolio.length,anySuccess=false;
   portfolio.forEach(function(p){
     fetchOneSafe(p.symbol).then(function(r){
       priceData[r.symbol]=r;if(!r.error)anySuccess=true;pending--;
       renderTable();updatePortfolioTotal();
-      if(pending===0){Promise.all(metricPromises).then(function(){renderTable();renderPfMeta();renderConsensus();renderBubblePanel();renderPriceTargetPanel();});
+      if(pending===0){
         var now=new Date(),hh=now.getHours(),mm=now.getMinutes();
-        document.getElementById('lastUpdate').textContent=anySuccess?(hh<10?'0'+hh:hh)+':'+(mm<10?'0'+mm:mm):'Failed — add Finnhub key or retry';
+        document.getElementById('lastUpdate').textContent=anySuccess?(hh<10?'0'+hh:hh)+':'+(mm<10?'0'+mm:mm):'Failed — retry shortly';
+        // ── PRIORITY 2 (deferred): everything else, only after prices are in. ──
+        renderPriceTargetPanel();
+        setTimeout(function(){
+          if(finnhubKey){
+            Promise.all(portfolio.map(function(pp){return fetchFinnhubMetrics(pp.symbol);}))
+              .then(function(){renderTable();renderPfMeta();renderConsensus();renderBubblePanel();});
+          } else {
+            renderBubblePanel();
+          }
+        },400);
       }
     });
   });
@@ -1361,9 +1378,14 @@ function showSetup(prefill){
 }
 function showDashboard(){
   document.getElementById('setupOverlay').style.display='none';document.getElementById('mainDashboard').style.display='grid';
-  renderTableSkeleton();fetchStockPrices();fetchIndices();fetchFearGreed();
-  setTimeout(connectWebSocket,1000);setTimeout(fetchAllRecommendations,2000);
-  clearInterval(fetchTimer);fetchTimer=setInterval(function(){fetchStockPrices();fetchIndices();fetchFearGreed();},REFRESH_MS);
+  // Prices first; defer indices / Fear&Greed / recommendations so they don't
+  // compete with the portfolio price fetches for proxy bandwidth.
+  renderTableSkeleton();fetchStockPrices();
+  setTimeout(fetchIndices,1500);
+  setTimeout(fetchFearGreed,2500);
+  setTimeout(connectWebSocket,1500);setTimeout(fetchAllRecommendations,4000);
+  clearInterval(fetchTimer);
+  fetchTimer=setInterval(function(){fetchStockPrices();setTimeout(fetchIndices,1500);setTimeout(fetchFearGreed,2500);},REFRESH_MS);
   setInterval(fetchAllRecommendations,30*60*1000);
 }
 document.getElementById('currencySel').value=activeCurrency;
