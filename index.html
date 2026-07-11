@@ -1096,35 +1096,67 @@ function openStockDetail(sym){
   var body=document.getElementById('sdBody');
   if(!avKey){body.innerHTML='<div class="sd-nd">Add a free <b>Alpha Vantage</b> key in the \uD83C\uDFAF Price Targets panel to load news, insider activity &amp; analytics.</div>';return;}
   if(sdCache[sym]){paintStockDetail(sym);return;}
-  body.innerHTML='<div class="sd-nd"><span class="spinner"></span>Loading insights (uses ~3 Alpha Vantage calls)\u2026</div>';
+  body.innerHTML='<div class="sd-nd"><span class="spinner"></span>Loading insights (uses ~5 Alpha Vantage calls)\u2026</div>';
   var base='https://www.alphavantage.co/query?apikey='+encodeURIComponent(avKey);
-  var pNews=fetch(base+'&function=NEWS_SENTIMENT&limit=10&tickers='+encodeURIComponent(sym)).then(function(r){return r.json();}).catch(function(){return null;});
-  var pIns =fetch(base+'&function=INSIDER_TRANSACTIONS&symbol='+encodeURIComponent(sym)).then(function(r){return r.json();}).catch(function(){return null;});
-  var pAna =fetch('https://alphavantageapi.co/timeseries/analytics?SYMBOLS='+encodeURIComponent(sym)+'&RANGE=6month&INTERVAL=DAILY&OHLC=close&CALCULATIONS=MEAN,STDDEV,MAX_DRAWDOWN,CUMULATIVE_RETURN,VARIANCE&apikey='+encodeURIComponent(avKey)).then(function(r){return r.json();}).catch(function(){return null;});
-  Promise.all([pNews,pIns,pAna]).then(function(res){
-    sdCache[sym]={news:res[0],insider:res[1],analytics:res[2]};
+  var jf=function(u){return fetch(u).then(function(r){return r.json();}).catch(function(){return null;});};
+  var pNews=jf(base+'&function=NEWS_SENTIMENT&limit=10&tickers='+encodeURIComponent(sym));
+  var pIns =jf(base+'&function=INSIDER_TRANSACTIONS&symbol='+encodeURIComponent(sym));
+  var pEarn=jf(base+'&function=EARNINGS&symbol='+encodeURIComponent(sym));
+  var pOv  =jf(base+'&function=OVERVIEW&symbol='+encodeURIComponent(sym));
+  var pCal =fetch(base+'&function=EARNINGS_CALENDAR&horizon=3month&symbol='+encodeURIComponent(sym)).then(function(r){return r.text();}).catch(function(){return null;});
+  Promise.all([pNews,pIns,pEarn,pOv,pCal]).then(function(res){
+    sdCache[sym]={news:res[0],insider:res[1],earnings:res[2],overview:res[3],calCsv:res[4]};
     if(document.getElementById('sdOverlay').classList.contains('open')&&document.getElementById('sdTitle').textContent===sym) paintStockDetail(sym);
   });
 }
 function paintStockDetail(sym){
   var body=document.getElementById('sdBody');if(!body)return;
   var c=sdCache[sym]||{},h='';
-  /* Analytics (9) */
-  h+='<div class="sd-sec"><div class="sd-sec-h">\uD83D\uDCC8 Analytics \u00b7 6-month daily</div>';
-  var rc=c.analytics&&c.analytics.payload&&c.analytics.payload.RETURNS_CALCULATIONS;
-  if(rc){
-    var g=function(k){var o=rc[k];if(!o)return null;var v=o[sym];return (v==null)?null:v;};
-    var mean=g('MEAN'),sd=g('STDDEV'),dd=g('MAX_DRAWDOWN'),cr=g('CUMULATIVE_RETURN');
-    var annRet=mean!=null?(mean*252*100):null,annVol=sd!=null?(sd*Math.sqrt(252)*100):null;
-    var rv=(annRet!=null&&annVol)?(annRet/annVol):null;
-    var st='';
-    if(cr!=null)st+='<div class="sd-stat"><div class="k">6M Return</div><div class="v" style="color:'+(cr>=0?'var(--accent-green)':'var(--accent-red)')+'">'+(cr>=0?'+':'')+(cr*100).toFixed(1)+'%</div></div>';
-    if(annRet!=null)st+='<div class="sd-stat"><div class="k">Ann. Return</div><div class="v">'+(annRet>=0?'+':'')+annRet.toFixed(1)+'%</div></div>';
-    if(annVol!=null)st+='<div class="sd-stat"><div class="k">Ann. Volatility</div><div class="v">'+annVol.toFixed(1)+'%</div></div>';
-    if(rv!=null)st+='<div class="sd-stat"><div class="k">Return / Vol</div><div class="v">'+rv.toFixed(2)+'</div></div>';
-    if(dd!=null)st+='<div class="sd-stat"><div class="k">Max Drawdown</div><div class="v" style="color:var(--accent-red)">'+(dd*100).toFixed(1)+'%</div></div>';
-    h+=st?('<div class="sd-stat-grid">'+st+'</div>'):'<div class="sd-nd">No analytics values returned.</div>';
-  } else { h+='<div class="sd-nd">Analytics unavailable (rate-limited or unsupported symbol).</div>'; }
+  var ov=c.overview||{};
+  var ovNum=function(k){var v=ov[k];if(v==null||v==='None'||v==='-'||v==='')return null;var n=parseFloat(v);return isNaN(n)?null:n;};
+  var fmtBig=function(v){var a=Math.abs(v),s=getSym();if(a>=1e12)return s+(v/1e12).toFixed(2)+'T';if(a>=1e9)return s+(v/1e9).toFixed(1)+'B';if(a>=1e6)return s+(v/1e6).toFixed(1)+'M';if(a>=1e3)return s+(v/1e3).toFixed(0)+'K';return s+Math.round(v);};
+  /* Next earnings date (3) */
+  h+='<div class="sd-sec"><div class="sd-sec-h">\uD83D\uDCC5 Next Earnings</div>';
+  var cal=(function(csv){if(!csv||csv.indexOf('reportDate')<0)return null;var L=csv.trim().split('\n');if(L.length<2)return null;var head=L[0].split(','),ri=head.indexOf('reportDate'),ei=head.indexOf('estimate');var r=L[1].split(',');return{date:ri>=0?r[ri]:'',est:ei>=0?r[ei]:''};})(c.calCsv);
+  if(cal&&cal.date){
+    var dt=new Date(cal.date+'T00:00:00'),days=Math.ceil((dt-new Date())/86400000);
+    h+='<div class="sd-stat-grid">'
+      +'<div class="sd-stat"><div class="k">Report Date</div><div class="v">'+cal.date+'</div></div>'
+      +'<div class="sd-stat"><div class="k">In</div><div class="v" style="color:'+(days<=7&&days>=0?'var(--accent-warm)':'var(--text-primary)')+'">'+(days>=0?days+'d':'\u2014')+'</div></div>'
+      +(cal.est&&cal.est!==''?'<div class="sd-stat"><div class="k">EPS Est.</div><div class="v">'+cal.est+'</div></div>':'')
+      +'</div>';
+  } else { h+='<div class="sd-nd">No upcoming earnings date (or rate-limited).</div>'; }
+  h+='</div>';
+  /* Fundamentals (4) */
+  h+='<div class="sd-sec"><div class="sd-sec-h">\uD83C\uDFE6 Fundamentals</div>';
+  if(ov&&(ov.MarketCapitalization||ov.RevenueTTM)){
+    var mc=ovNum('MarketCapitalization'),rev=ovNum('RevenueTTM'),pm=ovNum('ProfitMargin'),roe=ovNum('ReturnOnEquityTTM'),pe=ovNum('PERatio'),rg=ovNum('QuarterlyRevenueGrowthYOY');
+    var fst='';
+    if(mc!=null)fst+='<div class="sd-stat"><div class="k">Market Cap</div><div class="v">'+fmtBig(mc)+'</div></div>';
+    if(rev!=null)fst+='<div class="sd-stat"><div class="k">Revenue TTM</div><div class="v">'+fmtBig(rev)+'</div></div>';
+    if(pm!=null)fst+='<div class="sd-stat"><div class="k">Profit Margin</div><div class="v" style="color:'+(pm>=0?'var(--accent-green)':'var(--accent-red)')+'">'+(pm*100).toFixed(1)+'%</div></div>';
+    if(roe!=null)fst+='<div class="sd-stat"><div class="k">ROE</div><div class="v">'+(roe*100).toFixed(1)+'%</div></div>';
+    if(pe!=null)fst+='<div class="sd-stat"><div class="k">P/E</div><div class="v">'+pe.toFixed(1)+'</div></div>';
+    if(rg!=null)fst+='<div class="sd-stat"><div class="k">Rev Growth YoY</div><div class="v" style="color:'+(rg>=0?'var(--accent-green)':'var(--accent-red)')+'">'+(rg>=0?'+':'')+(rg*100).toFixed(1)+'%</div></div>';
+    h+=(fst?'<div class="sd-stat-grid">'+fst+'</div>':'')+((ov.Sector&&ov.Sector!=='None')?'<div class="sd-nd" style="text-align:left;padding-top:6px;">'+ov.Sector+(ov.Industry&&ov.Industry!=='None'?' \u00b7 '+ov.Industry:'')+'</div>':'');
+  } else { h+='<div class="sd-nd">Fundamentals unavailable (rate-limited).</div>'; }
+  h+='</div>';
+  /* Earnings history / beat-miss (2) */
+  h+='<div class="sd-sec"><div class="sd-sec-h">\uD83C\uDFAF Earnings History</div>';
+  var qe=c.earnings&&c.earnings.quarterlyEarnings;
+  if(qe&&qe.length){
+    var last=qe.slice(0,4),beats=0,cnt=0;
+    last.forEach(function(q){var sp=parseFloat(q.surprisePercent);if(!isNaN(sp)){cnt++;if(sp>0)beats++;}});
+    if(cnt)h+='<div class="sd-nd" style="text-align:left;padding:0 0 4px;">Beat estimates <b style="color:var(--accent-green)">'+beats+'</b> of last '+cnt+' quarters</div>';
+    last.forEach(function(q){
+      var rep=parseFloat(q.reportedEPS),est=parseFloat(q.estimatedEPS),sp=parseFloat(q.surprisePercent);
+      var scls=(!isNaN(sp)&&sp>0)?'sd-ins-buy':((!isNaN(sp)&&sp<0)?'sd-ins-sell':'sd-ins-badge');
+      h+='<div class="sd-ins-row">'
+        +'<span class="sd-ins-name">'+(q.fiscalDateEnding||'')+'</span>'
+        +'<span style="color:var(--text-sec);white-space:nowrap;">EPS '+(isNaN(rep)?'--':rep.toFixed(2))+' vs '+(isNaN(est)?'--':est.toFixed(2))+'</span>'
+        +'<span class="sd-ins-badge '+scls+'">'+(isNaN(sp)?'\u2014':(sp>=0?'+':'')+sp.toFixed(1)+'%')+'</span></div>';
+    });
+  } else { h+='<div class="sd-nd">No earnings history (or rate-limited).</div>'; }
   h+='</div>';
   /* News sentiment (5) */
   h+='<div class="sd-sec"><div class="sd-sec-h">\uD83D\uDCF0 News Sentiment</div>';
