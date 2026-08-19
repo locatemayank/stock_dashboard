@@ -1,8 +1,8 @@
 /* Stock Dashboard Service Worker */
 'use strict';
 
-var CACHE_NAME = 'stock-dash-v1';
-var APP_SHELL  = ['./stock_dashboard.html', './stock_manifest.json', './stock_icon.svg'];
+var CACHE_NAME = 'stock-dash-v2';
+var APP_SHELL  = ['./stock_dashboard.html', './stock_db.js', './stock_manifest.json', './stock_icon.svg'];
 
 // Install: cache app shell immediately
 self.addEventListener('install', function(e) {
