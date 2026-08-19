@@ -490,6 +490,14 @@
     </div>
     <div class="api-note">CSV needs a <b>symbol</b> (or ticker) column and a <b>shares</b> (or quantity) column. An optional <b>price</b> column lets the sheet drive live prices with <i>no API key</i> — e.g. Google Sheets <code>=GOOGLEFINANCE(A2,"price")</code>. An optional <b>prevclose</b> column enables day-change. In Google Sheets: <b>File → Share → Publish to web → (sheet) → CSV</b>, then paste that link here.</div>
     <div class="api-note" id="sheetStatus" style="margin-top:4px;"></div>
+    <div class="setup-section-label">Long-Term Capital-Gains Tax (estimate)</div>
+    <div class="api-row" style="gap:8px;flex-wrap:wrap;align-items:center;">
+      <span class="api-note" style="margin:0;">Fed&nbsp;%</span>
+      <input type="number" id="taxFed" min="0" max="40" step="0.1" placeholder="20" style="width:80px;flex:0 0 auto;" />
+      <span class="api-note" style="margin:0;">CA&nbsp;%</span>
+      <input type="number" id="taxCA" min="0" max="15" step="0.1" placeholder="10.3" style="width:80px;flex:0 0 auto;" />
+    </div>
+    <div class="api-note">Applied to <b>net long-term gains only</b> (losses offset gains; a net loss isn't taxed here). Defaults: Fed&nbsp;20% + CA&nbsp;10.3% = 30.3%. Estimate only &mdash; not tax advice.</div>
     <div class="setup-section-label">Data Backup &amp; Restore</div>
     <div class="api-note" style="margin-bottom:8px;">Your portfolio, keys &amp; last-fetched data live locally in IndexedDB. Export a backup file so you can restore everything if the browser cache is ever cleared.</div>
     <div class="api-row" style="gap:8px;">
@@ -541,6 +549,7 @@
       <div class="pf-meta-chip"><span class="pf-meta-label">Beta</span><span class="pf-meta-val" id="pfBeta">--</span></div>
       <div class="pf-meta-chip"><span class="pf-meta-label">Annual Div</span><span class="pf-meta-val" id="pfDiv">--</span></div>
       <div class="pf-meta-chip"><span class="pf-meta-label">Total P/L</span><span class="pf-meta-val" id="pfPL">--</span></div>
+      <div class="pf-meta-chip"><span class="pf-meta-label">After-Tax P/L</span><span class="pf-meta-val" id="pfPLNet">--</span></div>
       <div class="pf-meta-chip"><span class="pf-meta-label">&#9733; Consensus</span><span class="pf-meta-val" id="pfConsensus">--</span></div>
     </div>
     <div class="pf-distrib" id="pfDistrib"></div>
@@ -804,6 +813,10 @@ var SHEET_KEY='stockDash_sheet_v1';
 var sheetUrl=localStorage.getItem(SHEET_KEY)||'';
 var sheetPrices={}; // {SYM: {price,change,changePct,prevClose,name,state,error:false}}
 var pendingCost={}; // cost basis staged from a CSV upload, applied on Save {SYM:{avgCost,cost}}
+// Long-term capital-gains tax estimate (editable in Setup)
+var TAX_FED='stockDash_taxfed_v1',TAX_CA='stockDash_taxca_v1';
+var taxFed=parseFloat(localStorage.getItem(TAX_FED)); if(isNaN(taxFed)) taxFed=20;
+var taxCA=parseFloat(localStorage.getItem(TAX_CA)); if(isNaN(taxCA)) taxCA=10.3;
 
 /* Parse a local "lots" CSV (ticker, shares, price paid per share). The same
    ticker may appear on several rows (buy lots) — merge into one holding with
@@ -1510,6 +1523,8 @@ function renderPfMeta(){
   if(divEl)divEl.textContent=divResult.hasData?fmtDollar(divResult.total)+'/yr':'--';
   var plEl=document.getElementById('pfPL');
   if(plEl){var tc=0,tv=0,has=false;portfolio.forEach(function(p){var pd=priceData[p.symbol];if(p.avgCost!=null&&pd&&pd.price&&!pd.error){tc+=p.shares*p.avgCost;tv+=p.shares*pd.price;has=true;}});if(has&&tc>0){var pl=tv-tc,plp=pl/tc*100;plEl.textContent=(pl>=0?'+':'')+fmtDollar(pl)+' ('+(plp>=0?'+':'')+plp.toFixed(1)+'%)';plEl.className='pf-meta-val '+(pl>=0?'beta-low':'beta-vhigh');}else{plEl.textContent='--';plEl.className='pf-meta-val';}}
+  var plNetEl=document.getElementById('pfPLNet');
+  if(plNetEl){var gtc=0,gtv=0,gh=false;portfolio.forEach(function(p){var pd=priceData[p.symbol];if(p.avgCost!=null&&pd&&pd.price&&!pd.error){gtc+=p.shares*p.avgCost;gtv+=p.shares*pd.price;gh=true;}});if(gh&&gtc>0){var g=gtv-gtc,rate=(taxFed+taxCA)/100,net,eff;if(g>0){net=g*(1-rate);eff=rate*100;}else{net=g;eff=0;}plNetEl.textContent=(net>=0?'+':'')+fmtDollar(net)+(g>0?(' \u00b7 \u2212'+eff.toFixed(1)+'% tax'):' \u00b7 no tax');plNetEl.className='pf-meta-val '+(net>=0?'beta-low':'beta-vhigh');}else{plNetEl.textContent='--';plNetEl.className='pf-meta-val';}}
 }
 function updateMarketStatus(state){
   var badge=document.getElementById('mktBadge'),label=document.getElementById('mktLabel');if(!badge||!label)return;
@@ -1579,6 +1594,8 @@ document.getElementById('btnSave').addEventListener('click',function(){
   });
   portfolio=result;savePortfolio(portfolio);
   var k=(document.getElementById('finnhubKey').value||'').trim();if(k){finnhubKey=k;persistSetting(FINHUB_KEY_ST,k);}
+  var tf=parseFloat(document.getElementById('taxFed').value); if(!isNaN(tf)){ taxFed=tf; persistSetting(TAX_FED,String(tf)); }
+  var tca=parseFloat(document.getElementById('taxCA').value); if(!isNaN(tca)){ taxCA=tca; persistSetting(TAX_CA,String(tca)); }
   var su=(document.getElementById('sheetUrl').value||'').trim();
   if(su){ sheetUrl=su; persistSetting(SHEET_KEY,su); } else { sheetUrl=''; persistSetting(SHEET_KEY,''); sheetPrices={}; }
   showDashboard();
@@ -1683,6 +1700,8 @@ function showSetup(prefill){
   if(prefill&&portfolio.length)portfolio.forEach(function(p){addStockRow(p.symbol,p.shares);});else{addStockRow('','');addStockRow('','');}
   var ke=document.getElementById('finnhubKey');if(ke)ke.value=finnhubKey||'';
   var su=document.getElementById('sheetUrl');if(su)su.value=sheetUrl||'';
+  var tfe=document.getElementById('taxFed'); if(tfe) tfe.value=taxFed;
+  var tce=document.getElementById('taxCA'); if(tce) tce.value=taxCA;
   var ss=document.getElementById('sheetStatus');if(ss)ss.textContent='';
   var cs=document.getElementById('csvStatus');if(cs)cs.textContent=''; pendingCost={};
   document.getElementById('setupError').style.display='none';
