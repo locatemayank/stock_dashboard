@@ -35,7 +35,8 @@
     'stockDash_portfolio_v1',
     'stockDash_finnhub_v1',
     'stockDash_currency_v1',
-    'stockDash_av_v1'
+    'stockDash_av_v1',
+    'stockDash_sheet_v1'
   ];
 
   var _db = null;
