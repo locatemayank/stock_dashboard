@@ -549,7 +549,7 @@
       <div class="pf-meta-chip"><span class="pf-meta-label">Beta</span><span class="pf-meta-val" id="pfBeta">--</span></div>
       <div class="pf-meta-chip"><span class="pf-meta-label">Annual Div</span><span class="pf-meta-val" id="pfDiv">--</span></div>
       <div class="pf-meta-chip"><span class="pf-meta-label">Total P/L</span><span class="pf-meta-val" id="pfPL">--</span></div>
-      <div class="pf-meta-chip"><span class="pf-meta-label">After-Tax P/L</span><span class="pf-meta-val" id="pfPLNet">--</span></div>
+      <div class="pf-meta-chip"><span class="pf-meta-label">After-Tax Total</span><span class="pf-meta-val" id="pfPLNet">--</span></div>
       <div class="pf-meta-chip"><span class="pf-meta-label">&#9733; Consensus</span><span class="pf-meta-val" id="pfConsensus">--</span></div>
     </div>
     <div class="pf-distrib" id="pfDistrib"></div>
@@ -1524,7 +1524,7 @@ function renderPfMeta(){
   var plEl=document.getElementById('pfPL');
   if(plEl){var tc=0,tv=0,has=false;portfolio.forEach(function(p){var pd=priceData[p.symbol];if(p.avgCost!=null&&pd&&pd.price&&!pd.error){tc+=p.shares*p.avgCost;tv+=p.shares*pd.price;has=true;}});if(has&&tc>0){var pl=tv-tc,plp=pl/tc*100;plEl.textContent=(pl>=0?'+':'')+fmtDollar(pl)+' ('+(plp>=0?'+':'')+plp.toFixed(1)+'%)';plEl.className='pf-meta-val '+(pl>=0?'beta-low':'beta-vhigh');}else{plEl.textContent='--';plEl.className='pf-meta-val';}}
   var plNetEl=document.getElementById('pfPLNet');
-  if(plNetEl){var gtc=0,gtv=0,gh=false;portfolio.forEach(function(p){var pd=priceData[p.symbol];if(p.avgCost!=null&&pd&&pd.price&&!pd.error){gtc+=p.shares*p.avgCost;gtv+=p.shares*pd.price;gh=true;}});if(gh&&gtc>0){var g=gtv-gtc,rate=(taxFed+taxCA)/100,net,eff;if(g>0){net=g*(1-rate);eff=rate*100;}else{net=g;eff=0;}plNetEl.textContent=(net>=0?'+':'')+fmtDollar(net)+(g>0?(' \u00b7 \u2212'+eff.toFixed(1)+'% tax'):' \u00b7 no tax');plNetEl.className='pf-meta-val '+(net>=0?'beta-low':'beta-vhigh');}else{plNetEl.textContent='--';plNetEl.className='pf-meta-val';}}
+  if(plNetEl){var gtc=0,gtv=0,gh=false;portfolio.forEach(function(p){var pd=priceData[p.symbol];if(p.avgCost!=null&&pd&&pd.price&&!pd.error){gtc+=p.shares*p.avgCost;gtv+=p.shares*pd.price;gh=true;}});if(gh&&gtc>0){var g=gtv-gtc,rate=(taxFed+taxCA)/100,tax=g>0?g*rate:0,tot=gtv-tax,eff=g>0?rate*100:0;plNetEl.textContent=fmtDollar(tot)+(g>0?(' \u00b7 \u2212'+eff.toFixed(1)+'% tax'):' \u00b7 no tax');plNetEl.className='pf-meta-val '+(tot>=gtc?'beta-low':'beta-vhigh');}else{plNetEl.textContent='--';plNetEl.className='pf-meta-val';}}
 }
 function updateMarketStatus(state){
   var badge=document.getElementById('mktBadge'),label=document.getElementById('mktLabel');if(!badge||!label)return;
