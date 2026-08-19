@@ -78,8 +78,8 @@
     /* ════ MAIN DASHBOARD ════ */
     .dashboard { position:relative;z-index:2;width:100vw;height:100vh;display:grid;grid-template-rows:auto auto auto 1fr auto;padding:18px 40px 12px;gap:0; }
 
-    /* ── Top strip ── */
-    .top-strip { display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.07); }
+    /* ── Top strip (time / date / weather) — hidden: kept in DOM but not shown to reduce distraction ── */
+    .top-strip { display:none !important; }
     .top-time-wrap { display:flex;align-items:baseline;gap:3px; }
     .top-time { font-family:'Orbitron',monospace;font-size:clamp(58px,8.5vw,115px);font-weight:900;letter-spacing:.04em;line-height:1;background:linear-gradient(135deg,#e8f4fd,var(--accent-cyan) 50%,var(--accent-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-variant-numeric:tabular-nums; }
     .top-colon { font-family:'Orbitron',monospace;font-size:clamp(58px,8.5vw,115px);font-weight:900;color:var(--accent-cyan);-webkit-text-fill-color:var(--accent-cyan);animation:colonBlink 1s step-start infinite;margin:0 -1px; }
