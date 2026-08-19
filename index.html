@@ -476,6 +476,13 @@
       <a class="api-link" href="https://finnhub.io" target="_blank">Free key &#8599;</a>
     </div>
     <div class="api-note">Free at finnhub.io. Without it, those columns show "--".</div>
+    <div class="setup-section-label">Import Holdings from a CSV File (on this device)</div>
+    <div class="api-row" style="gap:8px;">
+      <button class="btn-add-stock" id="btnUploadCsv" type="button" style="margin-top:0;">&#128193; Choose CSV File</button>
+      <input type="file" id="csvFileInput" accept=".csv,text/csv,text/plain" style="display:none;" />
+    </div>
+    <div class="api-note">Private &mdash; read locally, <b>never uploaded</b>. Columns: <b>ticker</b>, <b>shares</b>, <b>price paid</b> (per share). The same ticker may appear on multiple rows (lots); they merge into total shares + a <b>weighted-average cost basis</b>, unlocking profit/loss &amp; sell signals.</div>
+    <div class="api-note" id="csvStatus" style="margin-top:4px;"></div>
     <div class="setup-section-label">Import from Online Sheet (CSV / Google Sheets)</div>
     <div class="api-row">
       <input type="text" id="sheetUrl" placeholder="Paste a published CSV URL" />
@@ -795,6 +802,38 @@ var ws=null;var wsRenderTimer=null;var wsReconnectTimer=null;var wsConnected=fal
 var SHEET_KEY='stockDash_sheet_v1';
 var sheetUrl=localStorage.getItem(SHEET_KEY)||'';
 var sheetPrices={}; // {SYM: {price,change,changePct,prevClose,name,state,error:false}}
+var pendingCost={}; // cost basis staged from a CSV upload, applied on Save {SYM:{avgCost,cost}}
+
+/* Parse a local "lots" CSV (ticker, shares, price paid per share). The same
+   ticker may appear on several rows (buy lots) — merge into one holding with
+   total shares and a weighted-average cost basis. */
+function parseLotsCSV(text){
+  var rows=parseCSV(text).filter(function(r){return r.some(function(c){return String(c).trim()!=='';});});
+  if(!rows.length) return [];
+  var header=rows[0].map(function(s){return String(s).trim().toLowerCase();});
+  var iSym=colIndex(header,['ticker','symbol','stock','sym']);
+  var iSh =colIndex(header,['shares','quantity','qty','units','shares held']);
+  var iPp =colIndex(header,['price paid','price_paid','pricepaid','cost','cost basis','avg cost','average cost','buy price','purchase price','price']);
+  var start=1;
+  if(iSym<0){ iSym=0; iSh=1; iPp=2; start=0; } // headerless: ticker,shares,price
+  var agg={};
+  for(var r=start;r<rows.length;r++){
+    var row=rows[r];
+    var sym=String(row[iSym]==null?'':row[iSym]).trim().toUpperCase(); if(!sym) continue;
+    var sh=iSh>=0?numFrom(row[iSh]):NaN; if(isNaN(sh)||sh<=0) continue;
+    var pp=iPp>=0?numFrom(row[iPp]):NaN;
+    if(!agg[sym]) agg[sym]={shares:0,cost:0,haveCost:false};
+    agg[sym].shares+=sh;
+    if(!isNaN(pp)&&pp>=0){ agg[sym].cost+=sh*pp; agg[sym].haveCost=true; }
+  }
+  var out=[];
+  Object.keys(agg).forEach(function(sym){
+    var a=agg[sym], e={symbol:sym,shares:a.shares};
+    if(a.haveCost&&a.shares>0){ e.avgCost=a.cost/a.shares; e.cost=a.cost; }
+    out.push(e);
+  });
+  return out;
+}
 
 /* ── Online CSV / Google Sheet import ──────────────────────────────
    Fetch a published CSV (Google Sheets → Publish to web → CSV) via the
@@ -1522,6 +1561,10 @@ document.getElementById('btnSave').addEventListener('click',function(){
   for(var i=0;i<rows.length;i++){var tick=rows[i].querySelector('.inp-ticker').value.trim().toUpperCase();var sh=parseFloat(rows[i].querySelector('.inp-shares').value);if(!tick){err='Please enter a ticker symbol for each row.';break;}if(!sh||sh<=0){err='Please enter a valid share count for '+tick+'.';break;}result.push({symbol:tick,shares:sh});}
   if(!result.length)err='Please add at least one stock.';
   if(err){var e=document.getElementById('setupError');e.textContent=err;e.style.display='block';return;}
+  result.forEach(function(e){
+    if(pendingCost[e.symbol]){ e.avgCost=pendingCost[e.symbol].avgCost; e.cost=pendingCost[e.symbol].cost; }
+    else { var old=portfolio.filter(function(o){return o.symbol===e.symbol;})[0]; if(old&&old.avgCost!=null){ e.avgCost=old.avgCost; e.cost=old.cost; } }
+  });
   portfolio=result;savePortfolio(portfolio);
   var k=(document.getElementById('finnhubKey').value||'').trim();if(k){finnhubKey=k;persistSetting(FINHUB_KEY_ST,k);}
   var su=(document.getElementById('sheetUrl').value||'').trim();
@@ -1529,6 +1572,29 @@ document.getElementById('btnSave').addEventListener('click',function(){
   showDashboard();
 });
 document.getElementById('btnEdit').addEventListener('click',function(){showSetup(true);});
+
+// ── Upload a private CSV file from this device (ticker, shares, price paid) ──
+document.getElementById('btnUploadCsv').addEventListener('click',function(){ document.getElementById('csvFileInput').click(); });
+document.getElementById('csvFileInput').addEventListener('change',function(){
+  var f=this.files&&this.files[0]; var st=document.getElementById('csvStatus');
+  if(!f){ return; }
+  st.style.color='var(--text-dim)'; st.innerHTML='<span class="spinner"></span>Reading file\u2026';
+  var reader=new FileReader();
+  reader.onload=function(){
+    try{
+      var lots=parseLotsCSV(String(reader.result||''));
+      if(!lots.length){ st.style.color='var(--accent-red)'; st.textContent='No valid rows — need ticker, shares, price paid.'; return; }
+      stockInputList.innerHTML='';
+      lots.forEach(function(h){ addStockRow(h.symbol,h.shares); });
+      pendingCost={}; lots.forEach(function(h){ if(h.avgCost!=null) pendingCost[h.symbol]={avgCost:h.avgCost,cost:h.cost}; });
+      var wc=lots.filter(function(h){return h.avgCost!=null;}).length;
+      st.style.color='var(--accent-green)'; st.textContent='Loaded '+lots.length+' holdings'+(wc?(' \u00b7 cost basis on '+wc):'')+' \u2713 (private)';
+    }catch(e){ st.style.color='var(--accent-red)'; st.textContent='Failed to read: '+((e&&e.message)||'parse error'); }
+  };
+  reader.onerror=function(){ st.style.color='var(--accent-red)'; st.textContent='Could not read the file.'; };
+  reader.readAsText(f);
+  this.value='';
+});
 
 // ── Load holdings + (optional) prices from an online CSV / Google Sheet ──
 document.getElementById('btnLoadSheet').addEventListener('click',function(){
@@ -1575,6 +1641,7 @@ function showSetup(prefill){
   var ke=document.getElementById('finnhubKey');if(ke)ke.value=finnhubKey||'';
   var su=document.getElementById('sheetUrl');if(su)su.value=sheetUrl||'';
   var ss=document.getElementById('sheetStatus');if(ss)ss.textContent='';
+  var cs=document.getElementById('csvStatus');if(cs)cs.textContent=''; pendingCost={};
   document.getElementById('setupError').style.display='none';
   document.getElementById('setupOverlay').style.display='flex';
   document.getElementById('mainDashboard').style.display='none';
