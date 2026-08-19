@@ -35,7 +35,8 @@
     'stockDash_portfolio_v1',
     'stockDash_finnhub_v1',
     'stockDash_currency_v1',
-    'stockDash_av_v1'
+    'stockDash_av_v1',
+    'stockDash_sheet_v1'
   ];
 
   var _db = null;
@@ -211,7 +212,7 @@
       var a = document.createElement('a');
       var stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
       a.href = url;
-      a.download = 'stock-dashboard-backup-' + stamp + '.json';
+      a.download = 'portfolio-predictor-backup-' + stamp + '.json';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -272,13 +273,3 @@
   };
 
 })(typeof window !== 'undefined' ? window : this);
-</content>
-<task_progress>
-- [x] Understand existing stock dashboard app
-- [x] Understand portfolio predictor app
-- [x] Create IndexedDB storage layer (stock_db.js)
-- [ ] Wire into stock_dashboard.html (mirror + cache + backup UI)
-- [ ] Wire into portfolio_predictor/index.html (mirror + cache + backup UI)
-- [ ] Update service workers to cache stock_db.js
-- [ ] Document changes in README
-</task_progress>

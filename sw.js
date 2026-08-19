@@ -1,8 +1,9 @@
 'use strict';
-const CACHE = 'portfolio-predictor-v2';
+const CACHE = 'portfolio-predictor-v3';
 const PRECACHE = [
   './',
   './index.html',
+  './stock_db.js',
   './manifest.json',
   './icon.svg',
   './icon-192.png',

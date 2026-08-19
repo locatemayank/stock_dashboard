@@ -16,16 +16,19 @@ A single-file, **100% client-side** portfolio dashboard and Monte Carlo forecast
 - **Multi-currency** — USD, EUR, GBP, CAD, INR with live FX rates.
 - **Fear & Greed index**, live market status (pre/open/after/closed), local weather + clock.
 - **PWA** — installable, works offline after first load.
+- **🗄️ Robust local storage (IndexedDB)** — your portfolio, API keys and the last-fetched market data are persisted in IndexedDB (not just the volatile `localStorage`), and survive browser restarts and cache pressure. Last-known prices show instantly (and offline) before fresh data arrives.
+- **⬇️⬆️ Backup & restore** — export a `.json` snapshot of everything and re-import it later — the ultimate protection against a cleared cache or moving to a new device/browser.
 
 ---
 
 ## 🏗️ Architecture
 
-Everything lives in a **single `index.html`** (~120 KB) — HTML, CSS, and vanilla JavaScript (no frameworks, no build step). State is stored in `localStorage`; nothing is sent to any server you don't explicitly call.
+Everything lives in a **single `index.html`** (~120 KB) — HTML, CSS, and vanilla JavaScript (no frameworks, no build step). Durable state is stored in **IndexedDB** (with a synchronous `localStorage` mirror for zero-refactor legacy reads); nothing is sent to any server you don't explicitly call.
 
 ```
 portfolio_predictor/
 ├── index.html            # The entire app (UI + simulation engine)
+├── stock_db.js           # Durable local data layer (IndexedDB + backup/restore)
 ├── manifest.json         # PWA manifest
 ├── sw.js                 # Service worker (offline caching)
 ├── icon.svg              # Scalable app icon
@@ -37,6 +40,24 @@ portfolio_predictor/
 ```
 
 Data flows entirely through public CORS-friendly APIs called directly from the browser (with proxy fallbacks). If the optional `data/market_history.js` file is present, the forecast engine uses historically-calibrated regime parameters; otherwise it falls back to built-in estimates.
+
+---
+
+## 🗄️ Data Management & Backups
+
+Browsers can evict `localStorage` under storage pressure — especially for installed PWAs on mobile — which previously risked losing your saved portfolio and keys. The app now uses a durable, multi-layer scheme implemented in `stock_db.js`:
+
+1. **IndexedDB is the source of truth.** Every write (portfolio, Finnhub/Alpha Vantage keys, currency) goes to IndexedDB *and* mirrors into `localStorage` so existing synchronous code keeps working.
+2. **Auto-hydration on boot.** If `localStorage` was evicted but IndexedDB survived, the app restores it automatically (and vice-versa — it seeds IndexedDB from any pre-existing `localStorage`).
+3. **Cached API snapshots.** The latest fetched prices, metrics and ratings are stored in IndexedDB, so the dashboard shows last-known values instantly on launch and while offline, then refreshes live.
+4. **Persistent storage request.** On first load the app calls `navigator.storage.persist()` to ask the browser not to evict its data.
+5. **Export / Import backups.** In the **Setup / Edit** screen, the **Data Backup & Restore** section lets you:
+   - **⬇️ Export Backup** — download a timestamped `.json` file containing your portfolio, keys and cached data.
+   - **⬆️ Import Backup** — restore everything from a previously-saved file (e.g. after clearing your cache, reinstalling, or switching devices/browsers). The app reloads automatically after import.
+
+The backup format is a plain JSON object (`type: "stockDashBackup"`) with `kv` (settings) and `cache` (API snapshots) sections, so it's human-readable and portable between the Portfolio Predictor and the companion Stock Dashboard (they share the same schema and IndexedDB database name `stockDashDB`).
+
+> Tip: export a backup after any major change to your holdings, and keep the file somewhere safe (cloud drive, email to yourself, etc.). If IndexedDB is unavailable (e.g. private-browsing mode), the app degrades gracefully to `localStorage`-only and the backup buttons will report that persistence is unavailable.
 
 ---
 

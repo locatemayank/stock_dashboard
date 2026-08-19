@@ -11,6 +11,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-192.png" />
   <title>Portfolio Predictor</title>
+  <script src="stock_db.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;900&family=Orbitron:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap');
     *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
@@ -60,7 +61,8 @@
 
     /* ── MAIN DASHBOARD ── */
     .dashboard{position:relative;z-index:2;width:100vw;height:100vh;display:grid;grid-template-rows:auto auto auto auto auto 1fr auto;padding:18px 40px 12px;gap:0;}
-    .top-strip{display:flex;align-items:center;justify-content:space-between;padding-bottom:12px;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.07);}
+    /* Top strip (time / date / weather) hidden to reduce distraction */
+    .top-strip{display:none !important;}
     .top-time-wrap{display:flex;align-items:baseline;gap:3px;}
     .top-time{font-family:'Orbitron',monospace;font-size:clamp(58px,8.5vw,115px);font-weight:900;letter-spacing:.04em;line-height:1;background:linear-gradient(135deg,#e8f4fd,var(--accent-cyan) 50%,var(--accent-blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-variant-numeric:tabular-nums;}
     .top-colon{font-family:'Orbitron',monospace;font-size:clamp(58px,8.5vw,115px);font-weight:900;color:var(--accent-cyan);-webkit-text-fill-color:var(--accent-cyan);animation:colonBlink 1s step-start infinite;margin:0 -1px;}
@@ -474,6 +476,21 @@
       <a class="api-link" href="https://finnhub.io" target="_blank">Free key &#8599;</a>
     </div>
     <div class="api-note">Free at finnhub.io. Without it, those columns show "--".</div>
+    <div class="setup-section-label">Import from Online Sheet (CSV / Google Sheets)</div>
+    <div class="api-row">
+      <input type="text" id="sheetUrl" placeholder="Paste a published CSV URL" />
+      <button class="btn-add-stock" id="btnLoadSheet" type="button" style="margin-top:0;white-space:nowrap;">Load</button>
+    </div>
+    <div class="api-note">CSV needs a <b>symbol</b> (or ticker) column and a <b>shares</b> (or quantity) column. An optional <b>price</b> column lets the sheet drive live prices with <i>no API key</i> — e.g. Google Sheets <code>=GOOGLEFINANCE(A2,"price")</code>. An optional <b>prevclose</b> column enables day-change. In Google Sheets: <b>File → Share → Publish to web → (sheet) → CSV</b>, then paste that link here.</div>
+    <div class="api-note" id="sheetStatus" style="margin-top:4px;"></div>
+    <div class="setup-section-label">Data Backup &amp; Restore</div>
+    <div class="api-note" style="margin-bottom:8px;">Your portfolio, keys &amp; last-fetched data live locally in IndexedDB. Export a backup file so you can restore everything if the browser cache is ever cleared.</div>
+    <div class="api-row" style="gap:8px;">
+      <button class="btn-add-stock" id="btnExportDB" type="button" style="margin-top:0;">&#11015; Export Backup</button>
+      <button class="btn-add-stock" id="btnImportDB" type="button" style="margin-top:0;">&#11014; Import Backup</button>
+      <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;" />
+    </div>
+    <div class="api-note" id="backupStatus" style="margin-top:6px;color:var(--accent-green);"></div>
     <div class="setup-error" id="setupError"></div>
     <div class="setup-footer"><button class="btn-save" id="btnSave">Save &amp; Start &#8594;</button></div>
   </div>
@@ -740,12 +757,119 @@ var STORAGE_KEY   = 'stockDash_portfolio_v1';
 var FINHUB_KEY_ST = 'stockDash_finnhub_v1';
 var CURRENCY_KEY  = 'stockDash_currency_v1';
 function loadPortfolio(){try{var d=localStorage.getItem(STORAGE_KEY);return d?JSON.parse(d):null;}catch(e){return null;}}
-function savePortfolio(p){localStorage.setItem(STORAGE_KEY,JSON.stringify(p));}
+function savePortfolio(p){
+  if(window.StockDB)StockDB.setItem(STORAGE_KEY,JSON.stringify(p));
+  else localStorage.setItem(STORAGE_KEY,JSON.stringify(p));
+}
+// Write a setting to both localStorage (sync) and IndexedDB (durable).
+function persistSetting(key,val){
+  if(window.StockDB)StockDB.setItem(key,val);
+  else localStorage.setItem(key,val);
+}
+// Persist the latest fetched API data to IndexedDB so it survives reloads
+// (and cache eviction) and can be shown instantly / offline.
+function cacheApiSnapshot(){
+  if(!window.StockDB)return;
+  StockDB.cacheSet('snapshot',{priceData:priceData,metricsData:metricsData,ratingsData:ratingsData,fngScore:fngScore});
+}
+// Restore last-known API data from IndexedDB (called on boot).
+function restoreApiSnapshot(){
+  if(!window.StockDB)return Promise.resolve(false);
+  return StockDB.cacheGet('snapshot').then(function(rec){
+    if(rec&&rec.data){
+      if(rec.data.priceData)priceData=rec.data.priceData;
+      if(rec.data.metricsData)metricsData=rec.data.metricsData;
+      if(rec.data.ratingsData)ratingsData=rec.data.ratingsData;
+      if(typeof rec.data.fngScore==='number')fngScore=rec.data.fngScore;
+      return true;
+    }
+    return false;
+  }).catch(function(){return false;});
+}
 
 var portfolio=[];var priceData={};var metricsData={};var ratingsData={};var ratingChanges={};var fngScore=50;
 var pfHidden=true; // privacy: portfolio value starts blurred each launch
 var finnhubKey='';var fetchTimer=null;var REFRESH_MS=5*60*1000;
 var ws=null;var wsRenderTimer=null;var wsReconnectTimer=null;var wsConnected=false;
+// Online CSV / Google Sheet price source
+var SHEET_KEY='stockDash_sheet_v1';
+var sheetUrl=localStorage.getItem(SHEET_KEY)||'';
+var sheetPrices={}; // {SYM: {price,change,changePct,prevClose,name,state,error:false}}
+
+/* ── Online CSV / Google Sheet import ──────────────────────────────
+   Fetch a published CSV (Google Sheets → Publish to web → CSV) via the
+   same CORS-proxy race used for prices, parse it, and pull holdings
+   (symbol + shares) and — if present — a live price column so the sheet
+   can drive prices with no API key (e.g. =GOOGLEFINANCE(A2,"price")). */
+function fetchCsvText(url){
+  var mk=function(u){return fetch(u).then(function(r){if(!r.ok)throw new Error(r.status);return r.text();});};
+  return raceFirstSuccess([
+    mk('https://api.allorigins.win/raw?url='+encodeURIComponent(url)),
+    mk('https://corsproxy.io/?url='+encodeURIComponent(url)),
+    mk('https://api.codetabs.com/v1/proxy/?quest='+encodeURIComponent(url)),
+    mk(url)
+  ]);
+}
+function parseCSV(text){
+  var rows=[],row=[],field='',i=0,inQ=false,ch;
+  for(;i<text.length;i++){
+    ch=text[i];
+    if(inQ){ if(ch==='"'){ if(text[i+1]==='"'){field+='"';i++;} else inQ=false; } else field+=ch; }
+    else if(ch==='"') inQ=true;
+    else if(ch===',') { row.push(field); field=''; }
+    else if(ch==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+    else if(ch==='\r'){ /* skip */ }
+    else field+=ch;
+  }
+  if(field.length||row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function colIndex(header,names){ for(var i=0;i<header.length;i++){ for(var j=0;j<names.length;j++){ if(header[i]===names[j]) return i; } } return -1; }
+function numFrom(v){ var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?NaN:n; }
+function parseSheet(text){
+  var rows=parseCSV(text).filter(function(r){return r.some(function(c){return String(c).trim()!=='';});});
+  if(!rows.length) return {holdings:[],prices:{}};
+  var header=rows[0].map(function(s){return String(s).trim().toLowerCase();});
+  var iSym=colIndex(header,['symbol','ticker','stock','sym']);
+  var iSh =colIndex(header,['shares','quantity','qty','units','shares held','holdings']);
+  var iPr =colIndex(header,['price','last','last price','current price','close','market price']);
+  var iPc =colIndex(header,['prevclose','prev close','previous close','pclose','yesterday']);
+  var iNm =colIndex(header,['name','company','description']);
+  var start=1;
+  if(iSym<0){ // no recognizable header — assume col0=symbol, col1=shares, col2=price
+    iSym=0; iSh=1; iPr=2; iPc=-1; iNm=-1; start=0;
+  }
+  var holdings=[],prices={};
+  for(var r=start;r<rows.length;r++){
+    var row=rows[r];
+    var sym=String(row[iSym]==null?'':row[iSym]).trim().toUpperCase();
+    if(!sym) continue;
+    var sh=iSh>=0?numFrom(row[iSh]):NaN;
+    if(!isNaN(sh)&&sh>0) holdings.push({symbol:sym,shares:sh});
+    if(iPr>=0){
+      var pr=numFrom(row[iPr]);
+      if(!isNaN(pr)&&pr>0){
+        var pc=iPc>=0?numFrom(row[iPc]):NaN;
+        prices[sym]={price:pr,prevClose:(!isNaN(pc)&&pc>0)?pc:pr,name:(iNm>=0?String(row[iNm]).trim():sym)||sym};
+      }
+    }
+  }
+  return {holdings:holdings,prices:prices};
+}
+function sheetPriceRecord(sym,p){
+  var st=getMarketStatusByTime();
+  return {symbol:sym,price:p.price,prevClose:p.prevClose,change:p.price-p.prevClose,
+          changePct:p.prevClose?((p.price-p.prevClose)/p.prevClose*100):0,name:p.name||sym,state:st,error:false};
+}
+// Refresh the sheet-driven price map (called each cycle when a sheet URL is set)
+function refreshSheetPrices(){
+  if(!sheetUrl) return Promise.resolve(false);
+  return fetchCsvText(sheetUrl).then(function(txt){
+    var pf=parseSheet(txt); sheetPrices={};
+    Object.keys(pf.prices).forEach(function(sym){ sheetPrices[sym]=sheetPriceRecord(sym,pf.prices[sym]); });
+    return true;
+  }).catch(function(){ return false; });
+}
 
 /* ══════════════════════════════════════════════
    2. CURRENCY
@@ -815,6 +939,8 @@ function fetchFinnhubSingle(symbol){
   });
 }
 function fetchOneSafe(symbol){
+  // Sheet-provided prices win instantly (offline-friendly, no API key needed).
+  if(sheetPrices[symbol]) return Promise.resolve(sheetPrices[symbol]);
   var sources=[fetchYahooSingle(symbol)];
   if(finnhubKey)sources.push(fetchFinnhubSingle(symbol));
   return raceFirstSuccess(sources).catch(function(){return{symbol:symbol,error:true};});
@@ -907,10 +1033,11 @@ function fetchStockPrices(){
         document.getElementById('lastUpdate').textContent=anySuccess?(hh<10?'0'+hh:hh)+':'+(mm<10?'0'+mm:mm):'Failed — retry shortly';
         // ── PRIORITY 2 (deferred): everything else, only after prices are in. ──
         renderPriceTargetPanel();
+        cacheApiSnapshot(); // persist prices immediately
         setTimeout(function(){
           if(finnhubKey){
             Promise.all(portfolio.map(function(pp){return fetchFinnhubMetrics(pp.symbol);}))
-              .then(function(){renderTable();renderPfMeta();renderConsensus();renderBubblePanel();});
+              .then(function(){renderTable();renderPfMeta();renderConsensus();renderBubblePanel();cacheApiSnapshot();});
           } else {
             renderBubblePanel();
           }
@@ -957,7 +1084,7 @@ function computeBubbleScore(symbol,weightPct){
 /* ── ANALYST PRICE TARGETS (top holding) ── */
 var ptSymbol='',ptTarget=null,ptFirms=null,ptLoading=false;
 var avKey=localStorage.getItem('stockDash_av_v1')||'';
-function saveAvKey(v){avKey=(v||'').trim();if(avKey){localStorage.setItem('stockDash_av_v1',avKey);}ptSymbol='';renderPriceTargetPanel();}
+function saveAvKey(v){avKey=(v||'').trim();if(avKey){persistSetting('stockDash_av_v1',avKey);}ptSymbol='';renderPriceTargetPanel();}
 function togglePtPanel(){
   var b=document.getElementById('ptBody'),t=document.getElementById('ptToggle');if(!b||!t)return;
   var open=b.style.display!=='none';b.style.display=open?'none':'';t.className=open?'pt-toggle':'pt-toggle open';
@@ -1396,14 +1523,58 @@ document.getElementById('btnSave').addEventListener('click',function(){
   if(!result.length)err='Please add at least one stock.';
   if(err){var e=document.getElementById('setupError');e.textContent=err;e.style.display='block';return;}
   portfolio=result;savePortfolio(portfolio);
-  var k=(document.getElementById('finnhubKey').value||'').trim();if(k){finnhubKey=k;localStorage.setItem(FINHUB_KEY_ST,k);}
+  var k=(document.getElementById('finnhubKey').value||'').trim();if(k){finnhubKey=k;persistSetting(FINHUB_KEY_ST,k);}
+  var su=(document.getElementById('sheetUrl').value||'').trim();
+  if(su){ sheetUrl=su; persistSetting(SHEET_KEY,su); } else { sheetUrl=''; persistSetting(SHEET_KEY,''); sheetPrices={}; }
   showDashboard();
 });
 document.getElementById('btnEdit').addEventListener('click',function(){showSetup(true);});
+
+// ── Load holdings + (optional) prices from an online CSV / Google Sheet ──
+document.getElementById('btnLoadSheet').addEventListener('click',function(){
+  var url=(document.getElementById('sheetUrl').value||'').trim();
+  var st=document.getElementById('sheetStatus');
+  if(!url){ st.style.color='var(--accent-red)'; st.textContent='Paste a CSV URL first.'; return; }
+  st.style.color='var(--text-dim)'; st.innerHTML='<span class="spinner"></span>Loading sheet\u2026';
+  fetchCsvText(url).then(function(txt){
+    var pf=parseSheet(txt);
+    if(!pf.holdings.length){ st.style.color='var(--accent-red)'; st.textContent='No valid rows found — need a symbol column and a shares column.'; return; }
+    stockInputList.innerHTML='';
+    pf.holdings.forEach(function(h){ addStockRow(h.symbol,h.shares); });
+    sheetUrl=url; persistSetting(SHEET_KEY,url);
+    sheetPrices={};
+    Object.keys(pf.prices).forEach(function(sym){ sheetPrices[sym]=sheetPriceRecord(sym,pf.prices[sym]); });
+    var pc=Object.keys(pf.prices).length;
+    st.style.color='var(--accent-green)';
+    st.textContent='Loaded '+pf.holdings.length+' holdings'+(pc?(' + '+pc+' live prices from sheet'):'')+' \u2713';
+  }).catch(function(e){ st.style.color='var(--accent-red)'; st.textContent='Failed to load: '+((e&&e.message)||'network / proxy error')+'. Ensure the sheet is Published to web as CSV.'; });
+});
+
+// ── Data backup / restore (IndexedDB export & import) ──────────────
+(function initBackupUI(){
+  var exp=document.getElementById('btnExportDB'),imp=document.getElementById('btnImportDB');
+  var fileInp=document.getElementById('importFileInput'),statusEl=document.getElementById('backupStatus');
+  function setStatus(msg,isErr){if(statusEl){statusEl.textContent=msg;statusEl.style.color=isErr?'var(--accent-red)':'var(--accent-green)';}}
+  if(exp)exp.addEventListener('click',function(){
+    if(!window.StockDB){setStatus('Backup needs IndexedDB (unavailable here).',true);return;}
+    StockDB.exportBackup().then(function(){setStatus('Backup downloaded \u2713');}).catch(function(e){setStatus('Export failed: '+e.message,true);});
+  });
+  if(imp&&fileInp){
+    imp.addEventListener('click',function(){fileInp.click();});
+    fileInp.addEventListener('change',function(){
+      var f=fileInp.files&&fileInp.files[0];if(!f)return;
+      if(!window.StockDB){setStatus('Import needs IndexedDB (unavailable here).',true);return;}
+      StockDB.importBackupFile(f).then(function(){setStatus('Backup imported \u2713 reloading\u2026');setTimeout(function(){location.reload();},800);}).catch(function(e){setStatus('Import failed: '+e.message,true);});
+      fileInp.value='';
+    });
+  }
+})();
 function showSetup(prefill){
   disconnectWebSocket();stockInputList.innerHTML='';
   if(prefill&&portfolio.length)portfolio.forEach(function(p){addStockRow(p.symbol,p.shares);});else{addStockRow('','');addStockRow('','');}
   var ke=document.getElementById('finnhubKey');if(ke)ke.value=finnhubKey||'';
+  var su=document.getElementById('sheetUrl');if(su)su.value=sheetUrl||'';
+  var ss=document.getElementById('sheetStatus');if(ss)ss.textContent='';
   document.getElementById('setupError').style.display='none';
   document.getElementById('setupOverlay').style.display='flex';
   document.getElementById('mainDashboard').style.display='none';
@@ -1412,16 +1583,17 @@ function showDashboard(){
   document.getElementById('setupOverlay').style.display='none';document.getElementById('mainDashboard').style.display='grid';
   // Prices first; defer indices / Fear&Greed / recommendations so they don't
   // compete with the portfolio price fetches for proxy bandwidth.
-  renderTableSkeleton();fetchStockPrices();
+  renderTableSkeleton();
+  refreshSheetPrices().then(function(){ fetchStockPrices(); });
   setTimeout(fetchIndices,1500);
   setTimeout(fetchFearGreed,2500);
   setTimeout(connectWebSocket,1500);setTimeout(fetchAllRecommendations,4000);
   clearInterval(fetchTimer);
-  fetchTimer=setInterval(function(){fetchStockPrices();setTimeout(fetchIndices,1500);setTimeout(fetchFearGreed,2500);},REFRESH_MS);
+  fetchTimer=setInterval(function(){refreshSheetPrices().then(function(){fetchStockPrices();});setTimeout(fetchIndices,1500);setTimeout(fetchFearGreed,2500);},REFRESH_MS);
   setInterval(fetchAllRecommendations,30*60*1000);
 }
 document.getElementById('currencySel').value=activeCurrency;
-document.getElementById('currencySel').addEventListener('change',function(){activeCurrency=this.value;localStorage.setItem(CURRENCY_KEY,activeCurrency);reRenderAll();});
+document.getElementById('currencySel').addEventListener('change',function(){activeCurrency=this.value;persistSetting(CURRENCY_KEY,activeCurrency);reRenderAll();});
 document.addEventListener('visibilitychange',function(){if(!document.hidden){if(finnhubKey&&portfolio.length)connectWebSocket();fetchStockPrices();}else{clearTimeout(wsRenderTimer);wsRenderTimer=null;}});
 
 /* ══════════════════════════════════════════════
@@ -2498,24 +2670,36 @@ function renderOptResult(stocks, curW, optW, curSt, optSt, objective, meta) {
 /* ══════════════════════════════════════════════
    19. BOOT
    ══════════════════════════════════════════════ */
-// Currency init
-document.getElementById('currencySel').value=activeCurrency;
-fetchExchangeRates();
-setInterval(fetchExchangeRates,60*60*1000);
+function boot(){
+  // Re-read after possible IndexedDB→localStorage hydration.
+  activeCurrency=localStorage.getItem(CURRENCY_KEY)||activeCurrency;
+  document.getElementById('currencySel').value=activeCurrency;
+  avKey=localStorage.getItem('stockDash_av_v1')||avKey;
+  sheetUrl=localStorage.getItem(SHEET_KEY)||sheetUrl;
+  fetchExchangeRates();
+  setInterval(fetchExchangeRates,60*60*1000);
 
-// Portfolio init
-var savedKey=localStorage.getItem(FINHUB_KEY_ST);
-if(savedKey) finnhubKey=savedKey;
+  var savedKey=localStorage.getItem(FINHUB_KEY_ST);
+  if(savedKey) finnhubKey=savedKey;
 
-var saved=loadPortfolio();
-if(saved&&saved.length){ portfolio=saved; showDashboard(); }
-else{ showSetup(false); addStockRow('AAPL',''); addStockRow('TSLA',''); }
+  var saved=loadPortfolio();
+  if(saved&&saved.length){
+    portfolio=saved;
+    // Show last-known cached data instantly, then refresh live.
+    restoreApiSnapshot().then(function(){ showDashboard(); });
+  }
+  else{ showSetup(false); addStockRow('AAPL',''); addStockRow('TSLA',''); }
 
-// Forecast UI init (after DOM ready)
-initForecastUI();
+  // Forecast UI init (after DOM ready)
+  initForecastUI();
+  // Privacy: blur portfolio value until long-press
+  initPrivacyToggle();
+}
 
-// Privacy: blur portfolio value until long-press
-initPrivacyToggle();
+// Initialize the durable data layer first (restores localStorage from
+// IndexedDB if the volatile storage was evicted), then boot the app.
+if(window.StockDB){ StockDB.init().then(boot).catch(boot); }
+else { boot(); }
 
 // PWA Service Worker
 if('serviceWorker' in navigator){
