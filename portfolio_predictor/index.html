@@ -478,10 +478,10 @@
     <div class="api-note">Free at finnhub.io. Without it, those columns show "--".</div>
     <div class="setup-section-label">Import Holdings from a CSV File (on this device)</div>
     <div class="api-row" style="gap:8px;">
-      <button class="btn-add-stock" id="btnUploadCsv" type="button" style="margin-top:0;">&#128193; Choose CSV / Excel File</button>
-      <input type="file" id="csvFileInput" accept=".csv,.tsv,.txt,.xlsx,.xls,.ods,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.oasis.opendocument.spreadsheet" style="display:none;" />
+      <button class="btn-add-stock" id="btnUploadCsv" type="button" style="margin-top:0;">&#128193; Choose File (CSV / Excel / Google Sheet)</button>
+      <input type="file" id="csvFileInput" style="display:none;" />
     </div>
-    <div class="api-note">Private &mdash; read locally, <b>never uploaded</b>. Accepts <b>CSV</b> or a downloaded <b>Google&nbsp;Sheet / Excel</b> file (<b>.xlsx</b>, .xls, .ods, .tsv). In Google Sheets use <b>File → Download → Microsoft Excel (.xlsx)</b> or <b>CSV</b>. Columns: <b>ticker</b>, <b>shares</b>, <b>price paid</b> (per share). The same ticker may appear on multiple rows (lots); they merge into total shares + a <b>weighted-average cost basis</b>, unlocking profit/loss &amp; sell signals.</div>
+    <div class="api-note">Private &mdash; read locally, <b>never uploaded</b>. Accepts <b>CSV</b>, <b>Excel</b> (.xlsx/.xls/.ods), <b>.tsv</b>, or a <b>Google&nbsp;Sheet</b> (.gsheet). <i>Note: a Google&nbsp;Sheet file is only a link with no data</i> &mdash; if you pick one, the sheet must be <b>shared / Published to web</b> so its rows can be fetched; otherwise use <b>File → Download → CSV</b> (or Excel) in Google Sheets. Columns: <b>ticker</b>, <b>shares</b>, <b>price paid</b> (per share). Same ticker on multiple rows (lots) merges into total shares + a <b>weighted-average cost basis</b>, unlocking profit/loss &amp; sell signals.</div>
     <div class="api-note" id="csvStatus" style="margin-top:4px;"></div>
     <div class="setup-section-label">Import from Online Sheet (CSV / Google Sheets)</div>
     <div class="api-row">
@@ -1608,7 +1608,18 @@ document.getElementById('csvFileInput').addEventListener('change',function(){
   var name=(f.name||'').toLowerCase();
   var reader=new FileReader();
   reader.onerror=function(){ st.style.color='var(--accent-red)'; st.textContent='Could not read the file.'; };
-  if(/\.(xlsx|xls|ods)$/.test(name)){
+  if(/\.gsheet$/.test(name)||f.type==='application/vnd.google-apps.spreadsheet'){
+    reader.onload=function(){
+      try{
+        var j=JSON.parse(String(reader.result||'{}'));
+        var id=j.doc_id||((/[-\w]{25,}/.exec(j.url||j.resource_id||''))||[''])[0];
+        if(!id) throw new Error('no id');
+        st.innerHTML='<span class="spinner"></span>Fetching Google Sheet\u2026';
+        fetchCsvText('https://docs.google.com/spreadsheets/d/'+id+'/export?format=csv').then(applyLots).catch(function(){ st.style.color='var(--accent-red)'; st.textContent='Could not fetch this Google Sheet (it must be shared / Published to web). Or download it as CSV / Excel and pick that instead.'; });
+      }catch(e){ st.style.color='var(--accent-red)'; st.textContent='A .gsheet file is only a link with no data. Share the sheet (or Publish to web), or download it as CSV / Excel.'; }
+    };
+    reader.readAsText(f);
+  } else if(/\.(xlsx|xls|ods)$/.test(name)){
     reader.onload=function(){
       loadXLSX().then(function(XLSX){
         var wb=XLSX.read(new Uint8Array(reader.result),{type:'array'});
