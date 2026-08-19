@@ -540,6 +540,7 @@
     <div class="pf-meta" id="pfMeta">
       <div class="pf-meta-chip"><span class="pf-meta-label">Beta</span><span class="pf-meta-val" id="pfBeta">--</span></div>
       <div class="pf-meta-chip"><span class="pf-meta-label">Annual Div</span><span class="pf-meta-val" id="pfDiv">--</span></div>
+      <div class="pf-meta-chip"><span class="pf-meta-label">Total P/L</span><span class="pf-meta-val" id="pfPL">--</span></div>
       <div class="pf-meta-chip"><span class="pf-meta-label">&#9733; Consensus</span><span class="pf-meta-val" id="pfConsensus">--</span></div>
     </div>
     <div class="pf-distrib" id="pfDistrib"></div>
@@ -1448,7 +1449,15 @@ function renderTable(){
     else{var v=p.shares*pd.price,chg=p.shares*pd.change;priceStr=fmtPrice(pd.price);valueStr=fmtDollar(v);var sign=chg>=0?'&#9650;':'&#9660;';var pctStr=(pd.changePct>=0?'+':'')+pd.changePct.toFixed(2)+'%';changeStr='<span class="chg-full">'+sign+'&nbsp;'+fmtShort(chg)+'&nbsp;('+pctStr+')</span><span class="chg-short">'+sign+'&nbsp;'+pctStr+'</span>';changeCls=chg>0.001?'up':(chg<-0.001?'down':'flat');nameStr=pd.name;}
     var rat=ratingsData[p.symbol],chgRat=ratingChanges[p.symbol];
     var ratHtml=rat?'<div class="rat-badge '+rat.cls+'">'+rat.label+(chgRat?'<span style="font-size:8px;display:block;color:'+(chgRat.dir==='up'?'var(--accent-green)':'var(--accent-red)')+';">'+(chgRat.dir==='up'?'\u2191':'\u2193')+' was '+chgRat.fromLabel+'</span>':'')+'</div>':'';
-    html+='<tr onclick="openStockDetail(\''+p.symbol+'\')"><td><div class="td-symbol">'+p.symbol+'</div><div class="td-name">'+nameStr+'</div>'+(pd&&pd.price&&!pd.error?render52wBar(p.symbol,pd.price):'')+ratHtml+'</td><td class="td-shares">'+p.shares.toLocaleString()+'</td><td class="td-price">'+priceStr+'</td><td class="td-value">'+valueStr+'</td><td class="td-change '+changeCls+'">'+changeStr+'</td></tr>';
+    var plHtml='';
+    if(pd&&pd.price&&!pd.error&&p.avgCost!=null){
+      var _cost=p.shares*p.avgCost,_val=p.shares*pd.price,_pl=_val-_cost,_plp=_cost?_pl/_cost*100:0,_hint='';
+      if(_plp>=100)_hint=' \u00b7 \uD83D\uDCB0 up '+Math.round(_plp)+'% — consider trimming';
+      else if(_plp>=50)_hint=' \u00b7 \uD83D\uDCB0 big gain';
+      else if(_plp<=-20)_hint=' \u00b7 \uD83D\uDD3B review';
+      plHtml='<div class="td-name" style="margin-top:2px;color:'+(_pl>=0?'var(--accent-green)':'var(--accent-red)')+'">Cost '+fmtPrice(p.avgCost)+' \u00b7 P/L '+(_pl>=0?'+':'')+fmtShort(_pl)+' ('+(_plp>=0?'+':'')+_plp.toFixed(1)+'%)'+_hint+'</div>';
+    }
+    html+='<tr onclick="openStockDetail(\''+p.symbol+'\')"><td><div class="td-symbol">'+p.symbol+'</div><div class="td-name">'+nameStr+'</div>'+(pd&&pd.price&&!pd.error?render52wBar(p.symbol,pd.price):'')+ratHtml+plHtml+'</td><td class="td-shares">'+p.shares.toLocaleString()+'</td><td class="td-price">'+priceStr+'</td><td class="td-value">'+valueStr+'</td><td class="td-change '+changeCls+'">'+changeStr+'</td></tr>';
   });
   tbody.innerHTML=html||'<tr><td colspan="5" class="stock-empty">No stocks.</td></tr>';
 }
@@ -1465,6 +1474,7 @@ function updatePortfolioTotal(){
   var prevT=totals.value-totals.change,pct=prevT?totals.change/prevT*100:0;
   changeEl.innerHTML=(totals.change>=0?'&#9650;':'&#9660;')+'&nbsp;'+fmtShort(totals.change)+'&nbsp;&nbsp;('+(pct>=0?'+':'')+pct.toFixed(2)+'%)&nbsp;&nbsp;today';
   applyPfPrivacy();
+  renderPfMeta();
 }
 /* ── PRIVACY: blur portfolio value until long-press ── */
 function applyPfPrivacy(){
@@ -1498,6 +1508,8 @@ function renderPfMeta(){
   if(betaEl){if(betaVal===null){betaEl.textContent='--';betaEl.className='pf-meta-val';}else{var cls='beta-low',desc='Low Risk';if(betaVal>1.5){cls='beta-vhigh';desc='High Risk';}else if(betaVal>1.2){cls='beta-high';desc='Aggressive';}else if(betaVal>0.8){cls='beta-mod';desc='Moderate';}betaEl.textContent=betaVal.toFixed(2)+' \u00b7 '+desc;betaEl.className='pf-meta-val '+cls;}}
   var divResult=calcAnnualDividends(),divEl=document.getElementById('pfDiv');
   if(divEl)divEl.textContent=divResult.hasData?fmtDollar(divResult.total)+'/yr':'--';
+  var plEl=document.getElementById('pfPL');
+  if(plEl){var tc=0,tv=0,has=false;portfolio.forEach(function(p){var pd=priceData[p.symbol];if(p.avgCost!=null&&pd&&pd.price&&!pd.error){tc+=p.shares*p.avgCost;tv+=p.shares*pd.price;has=true;}});if(has&&tc>0){var pl=tv-tc,plp=pl/tc*100;plEl.textContent=(pl>=0?'+':'')+fmtDollar(pl)+' ('+(plp>=0?'+':'')+plp.toFixed(1)+'%)';plEl.className='pf-meta-val '+(pl>=0?'beta-low':'beta-vhigh');}else{plEl.textContent='--';plEl.className='pf-meta-val';}}
 }
 function updateMarketStatus(state){
   var badge=document.getElementById('mktBadge'),label=document.getElementById('mktLabel');if(!badge||!label)return;
