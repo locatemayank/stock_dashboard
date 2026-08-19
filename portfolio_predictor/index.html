@@ -478,10 +478,10 @@
     <div class="api-note">Free at finnhub.io. Without it, those columns show "--".</div>
     <div class="setup-section-label">Import Holdings from a CSV File (on this device)</div>
     <div class="api-row" style="gap:8px;">
-      <button class="btn-add-stock" id="btnUploadCsv" type="button" style="margin-top:0;">&#128193; Choose CSV File</button>
-      <input type="file" id="csvFileInput" accept=".csv,text/csv,text/plain" style="display:none;" />
+      <button class="btn-add-stock" id="btnUploadCsv" type="button" style="margin-top:0;">&#128193; Choose CSV / Excel File</button>
+      <input type="file" id="csvFileInput" accept=".csv,.tsv,.txt,.xlsx,.xls,.ods,text/csv,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.oasis.opendocument.spreadsheet" style="display:none;" />
     </div>
-    <div class="api-note">Private &mdash; read locally, <b>never uploaded</b>. Columns: <b>ticker</b>, <b>shares</b>, <b>price paid</b> (per share). The same ticker may appear on multiple rows (lots); they merge into total shares + a <b>weighted-average cost basis</b>, unlocking profit/loss &amp; sell signals.</div>
+    <div class="api-note">Private &mdash; read locally, <b>never uploaded</b>. Accepts <b>CSV</b> or a downloaded <b>Google&nbsp;Sheet / Excel</b> file (<b>.xlsx</b>, .xls, .ods, .tsv). In Google Sheets use <b>File → Download → Microsoft Excel (.xlsx)</b> or <b>CSV</b>. Columns: <b>ticker</b>, <b>shares</b>, <b>price paid</b> (per share). The same ticker may appear on multiple rows (lots); they merge into total shares + a <b>weighted-average cost basis</b>, unlocking profit/loss &amp; sell signals.</div>
     <div class="api-note" id="csvStatus" style="margin-top:4px;"></div>
     <div class="setup-section-label">Import from Online Sheet (CSV / Google Sheets)</div>
     <div class="api-row">
@@ -1587,25 +1587,45 @@ document.getElementById('btnEdit').addEventListener('click',function(){showSetup
 
 // ── Upload a private CSV file from this device (ticker, shares, price paid) ──
 document.getElementById('btnUploadCsv').addEventListener('click',function(){ document.getElementById('csvFileInput').click(); });
+// Load SheetJS on demand (only when an Excel/ODS file is chosen) to parse
+// downloaded Google Sheets locally; nothing is uploaded.
+function loadXLSX(){return new Promise(function(res,rej){if(window.XLSX)return res(window.XLSX);var sc=document.createElement('script');sc.src='https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js';sc.onload=function(){window.XLSX?res(window.XLSX):rej(new Error('Spreadsheet library failed to load.'));};sc.onerror=function(){rej(new Error('Could not load spreadsheet library (offline?). Please download as CSV instead.'));};document.head.appendChild(sc);});}
 document.getElementById('csvFileInput').addEventListener('change',function(){
-  var f=this.files&&this.files[0]; var st=document.getElementById('csvStatus');
+  var f=this.files&&this.files[0]; var st=document.getElementById('csvStatus'); var self=this;
   if(!f){ return; }
   st.style.color='var(--text-dim)'; st.innerHTML='<span class="spinner"></span>Reading file\u2026';
-  var reader=new FileReader();
-  reader.onload=function(){
+  function applyLots(text){
     try{
-      var lots=parseLotsCSV(String(reader.result||''));
+      var lots=parseLotsCSV(text);
       if(!lots.length){ st.style.color='var(--accent-red)'; st.textContent='No valid rows — need ticker, shares, price paid.'; return; }
       stockInputList.innerHTML='';
       lots.forEach(function(h){ addStockRow(h.symbol,h.shares); });
       pendingCost={}; lots.forEach(function(h){ if(h.avgCost!=null) pendingCost[h.symbol]={avgCost:h.avgCost,cost:h.cost}; });
       var wc=lots.filter(function(h){return h.avgCost!=null;}).length;
       st.style.color='var(--accent-green)'; st.textContent='Loaded '+lots.length+' holdings'+(wc?(' \u00b7 cost basis on '+wc):'')+' \u2713 (private)';
-    }catch(e){ st.style.color='var(--accent-red)'; st.textContent='Failed to read: '+((e&&e.message)||'parse error'); }
-  };
+    }catch(e){ st.style.color='var(--accent-red)'; st.textContent='Failed to parse: '+((e&&e.message)||'parse error'); }
+  }
+  var name=(f.name||'').toLowerCase();
+  var reader=new FileReader();
   reader.onerror=function(){ st.style.color='var(--accent-red)'; st.textContent='Could not read the file.'; };
-  reader.readAsText(f);
-  this.value='';
+  if(/\.(xlsx|xls|ods)$/.test(name)){
+    reader.onload=function(){
+      loadXLSX().then(function(XLSX){
+        var wb=XLSX.read(new Uint8Array(reader.result),{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        applyLots(XLSX.utils.sheet_to_csv(ws));
+      }).catch(function(e){ st.style.color='var(--accent-red)'; st.textContent=(e&&e.message)||'Spreadsheet parse failed.'; });
+    };
+    reader.readAsArrayBuffer(f);
+  } else {
+    reader.onload=function(){
+      var txt=String(reader.result||'');
+      if(/\.tsv$/.test(name)||(txt.indexOf('\t')>=0&&txt.indexOf(',')<0)) txt=txt.replace(/\t/g,',');
+      applyLots(txt);
+    };
+    reader.readAsText(f);
+  }
+  self.value='';
 });
 
 // ── Load holdings + (optional) prices from an online CSV / Google Sheet ──
